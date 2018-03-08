@@ -18,13 +18,13 @@ val: clean compile link runValgrind
 
 
 # Variable to give as command line argument. Holds the image path
-fileName = deneme.txt
+fileName = test.tif
 
 
 
 # Compiles all C files
 compile:
-	gcc -c *.c
+	gcc -c *.c -ansi -Wall -pedantic -errors
 
 # Links all Object files into an executable named exe
 link:
