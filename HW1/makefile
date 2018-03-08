@@ -28,7 +28,7 @@ compile:
 
 # Links all Object files into an executable named exe
 link:
-	gcc -o exe
+	gcc -o exe *.o
 
 # Runs the executable named exe, gives fileName as second argument
 run:
@@ -43,9 +43,8 @@ clear:
 	clear
 
 # Removes all Object files and exe file, clears terminal afterwards
-clean:
+clean: clear
 	rm -f *.o exe
-	clear
 
 
 
