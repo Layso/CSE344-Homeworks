@@ -3,3 +3,7 @@
 
 # Executable file created from linking Object files
 exe
+
+# TIFF image files
+*.tif
+*.tiff
