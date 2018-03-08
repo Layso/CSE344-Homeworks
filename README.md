@@ -1,3 +1,6 @@
-#System Programming Homework 1
+# CSE344-Homeworks
+This repository contains all homeworks of the System Programming course, Spring 2018. Each homework folder contains both homework definition PDF and my commitment for it. Main objective(s) of the course is learning POSIX standarts, implementing error free programs and using/controlling threads. All comments and criticisim are appreciated.
+--
+Course Teacher: Erkan Zergeroğlu
 
-In this homework the program should load a TIFF (Tagged Image File Format) file and print the image on console. Images are expected to be black and white only. So, black pixels will be represented by 0's while whites are represented by 1's. Path of the file will be given as command line argument. See homework definition for more information
+Teaching Assistant: Ahmet Soyyiğit
