@@ -1,0 +1,5 @@
+# Object files created from compiling C files
+*.o
+
+# Executable file created from linking Object files
+exe
