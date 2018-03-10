@@ -20,12 +20,14 @@
 #define ERROR_CODE -1
 #define EXTENSION_LENGTH 4
 #define TIF_EXTENSION ".tif"
+#define BUFFER_LENGTH 128
 
 
 
 /* Function prototype(s) */
 int ScanAndPrint(char fileName[]);
 int CheckFile(char fileName[]);
+int ScanFile(char fileName[]);
 
 
 
@@ -100,6 +102,33 @@ int CheckFile(char fileName[]) {
     status = close(file);
     if (status == ERROR_CODE) {
         fprintf(stderr, "\nError!\nCouldn't close file after check: %s\nReason of error: %s\n", fileName, strerror(errno));
+        return ERROR_CODE;
+    }
+
+
+    return SAFE_EXIT_CODE;
+}
+
+
+
+/* Function to read information from file */
+int ScanFile(char fileName[]) {
+    int file = ZERO;
+    int status = ZERO;
+    char buffer[BUFFER_LENGTH];
+
+
+    file = open(fileName, O_RDONLY);
+    if (file == ERROR_CODE) {
+        fprintf(stderr, "\nError!\nCouldn't open file to scan: %s\nReason of error: %s\n", fileName, strerror(errno));
+        return ERROR_CODE;
+    }
+
+
+
+    status = close(file);
+    if (status == ERROR_CODE) {
+        fprintf(stderr, "\nError!\nCouldn't close file after scan: %s\nReason of error: %s\n", fileName, strerror(errno));
         return ERROR_CODE;
     }
 
