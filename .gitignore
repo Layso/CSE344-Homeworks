@@ -7,3 +7,5 @@ exe
 # TIFF image files
 *.tif
 *.tiff
+*.TIFF
+*.TIF

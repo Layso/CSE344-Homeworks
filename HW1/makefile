@@ -15,6 +15,7 @@ dev: clean compile link run
 # 2 Runs the executable with valgrind instead of directly running it
 val: clean compile link runValgrind
 
+devwo:clean compilewo link run
 
 
 # Variable to give as command line argument. Holds the image path
@@ -25,6 +26,10 @@ fileName = test.tif
 # Compiles all C files
 compile:
 	gcc -c *.c -ansi -Wall -pedantic -errors
+
+# Compiles without checking warnings
+compilewo:
+	gcc -c *.c
 
 # Links all Object files into an executable named exe
 link:
