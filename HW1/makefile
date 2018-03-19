@@ -19,7 +19,7 @@ devwo:clean compilewo link run
 
 
 # Variable to give as command line argument. Holds the image path
-fileName = test.tif
+fileName = ./Images/smileyGreyLayers.tif
 
 
 

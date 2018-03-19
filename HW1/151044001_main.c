@@ -1,60 +1,4 @@
-/* Include(s) */
-#include "stdio.h"
-#include "sys/stat.h"
-#include "sys/types.h"
-#include "fcntl.h"
-#include "unistd.h"
-#include "errno.h"
-#include "string.h"
-
-
-
-/* Macro(s) to use as constant definition(s) */
-#define ZERO 0
-#define TRUE 1
-#define FALSE 0
-#define REQUIRED_ARGUMENT_COUNT 2
-#define EXE_NAME_INDEX 0
-#define FILE_NAME_INDEX 1
-#define ERROR_EXIT_CODE 1
-#define SAFE_EXIT_CODE 0
-#define ERROR_CODE -1
-#define SAFE_CODE 0
-#define TIF_EXTENSION_1 "tif"
-#define TIF_EXTENSION_2 "TIF"
-#define TIF_EXTENSION_3 "tiff"
-#define TIF_EXTENSION_4 "TIFF"
-#define BUFFER_LENGTH 128
-#define NULL_CHARACTER '\0'
-#define INTEL_BYTE_ORDER "II"
-#define MOTOROLA_BYTE_ORDER "MM"
-
-
-
-/* Structs transport more data with less effort */
-struct ImageFileHeader {
-    unsigned short byteOrder;
-    unsigned short tiffVersion;
-    unsigned int ifdOffset;
-};
-
-
-
-struct ImageFileDirectory {
-    unsigned short tagID;
-    unsigned short dataType;
-    unsigned int dataCount;
-    unsigned int dataOffset;
-};
-
-
-
-/* Function prototype(s) */
-int ScanAndPrint(char fileName[]);
-int CheckFile(char fileName[]);
-int ScanFileHeader(char fileName[], struct ImageFileHeader *ifhPtr);
-int ScanFileDirectory(char fileName[], struct ImageFileHeader ifh, int *pixelWidth, int *pixelHeight, int *layerCount);
-char *GetFileExtension(char fileName[]);
+#include "151044001_main.h"
 
 
 
@@ -79,195 +23,211 @@ int main(int argc, char *argv[]) {
 /* Main function to scan given file and print to console */
 int ScanAndPrint(char fileName[]) {
     struct ImageFileHeader ifh;
-    int pixelHeight;
-    int pixelWidth;
-    int layerCount;
-
-
-    /* Clearing struct */
-    memset(&ifh, ZERO, sizeof(ifh));
+    struct ImageFileDirectory ifd;
+    int fileDescriptor;
+    int errorFlag = FALSE;
+    int **bitmapArray;
 
 
     /* Checking file first */
-    printf("Controlling file: \"%s\"\n", fileName);
-    if (CheckFile(fileName) == ERROR_CODE) {
-        return ERROR_CODE;
-    }
-
+    errorFlag = CheckTiffFile(fileName, &fileDescriptor);
+    
     /* Scanning image file header */
-    printf("Scanning file header\n");
-    if (ScanFileHeader(fileName, &ifh) == ERROR_CODE) {
-        return ERROR_CODE;
+    if (!errorFlag) {
+        errorFlag = ScanHeaderAndDirectory(fileDescriptor, &ifh, &ifd);
     }
 
-    /* Scanning image file directory */
-    printf("Scanning file directory\n");
-    if (ScanFileDirectory(fileName, ifh, &pixelWidth, &pixelHeight, &layerCount)) {
-        return ERROR_CODE;
+    /* Scanning image bitmap */
+    if (!errorFlag) {
+        errorFlag = ScanImageBitmap(fileDescriptor, ifd, &bitmapArray);
     }
 
-    printf("Byte order: %04X\n", ifh.byteOrder);
-    printf("Version: %04X\n", ifh.tiffVersion);
-    printf("Offset: %04X\n", ifh.ifdOffset);
-   /* if (!strcmp(INTEL_BYTE_ORDER, ifh.byteOrder))
-        printf("Intel\n");
-    else if (!strcmp(MOTOROLA_BYTE_ORDER, ifh.byteOrder))
-        printf("Motorola\n");
-    else
-        printf("Undefined\n");
-*/
-    return SAFE_EXIT_CODE;
+
+
+    ClearMemoryAllocations(&fileDescriptor, &ifd, &bitmapArray);
+
+    return errorFlag;
 }
 
 
 
 /* Function to check if file exists and safe to read */
-int CheckFile(char fileName[]) {
-    int file = ZERO;
-    int status = ZERO;
+int CheckTiffFile(char fileName[], int *fileDescriptor) {
+    int errorFlag = FALSE;
     struct stat fileStats;
     char *fileExtension = NULL;
+    int status;
 
-
+    
+    /* Checking if file extension belongs to a TIFF file */
     fileExtension = GetFileExtension(fileName);
-    /* Checking file name if it's extension is .tif */
     if ((strcmp(fileExtension, TIF_EXTENSION_1) != ZERO) && (strcmp(fileExtension, TIF_EXTENSION_2) != ZERO)
      && (strcmp(fileExtension, TIF_EXTENSION_3) != ZERO) && (strcmp(fileExtension, TIF_EXTENSION_4) != ZERO)) {
         fprintf(stderr, "\nError!\nFile extension is incompatible: %s\nExpected extensions: .%s / .%s / .%s / .%s\n", 
         fileName, TIF_EXTENSION_1, TIF_EXTENSION_2, TIF_EXTENSION_3, TIF_EXTENSION_4);
-        return ERROR_CODE;
+        errorFlag = TRUE;
     }
     
     /* Checking if path points to a file */
-    status = stat(fileName, &fileStats);
-    if (status == ERROR_CODE || !S_ISREG(fileStats.st_mode)) {
-        fprintf(stderr, "\nError!\nEither path is not a file or couldn't read path stats: %s\n", fileName);
-        return ERROR_CODE;
+    if (!errorFlag) {
+        status = stat(fileName, &fileStats);
+        if (status == ERROR_CODE || !S_ISREG(fileStats.st_mode)) {
+            fprintf(stderr, "\nError!\nEither path is not a file or couldn't read path stats: %s\n", fileName);
+
+            if (status == ERROR_CODE)
+                fprintf(stderr, "Reason of error: %s\n", strerror(errno));
+            
+            errorFlag = TRUE;
+        }
     }
 
     /* Checking if file can be opened */
-    file = open(fileName, O_RDONLY);
-    if (file == ERROR_CODE) {
-        fprintf(stderr, "\nError!\nCouldn't open file to check: %s\nReason of error: %s\n", fileName, strerror(errno));
-        return ERROR_CODE;
+    if (!errorFlag) {
+        *fileDescriptor = open(fileName, O_RDONLY);
+        if (*fileDescriptor == ERROR_CODE) {
+            fprintf(stderr, "\nError!\nCouldn't open file to check: %s\nReason of error: %s\n", fileName, strerror(errno));
+            errorFlag = TRUE;
+        }
     }
+    
 
-    /* Closing file to release it */
-    status = close(file);
-    if (status == ERROR_CODE) {
-        fprintf(stderr, "\nError!\nCouldn't close file after check: %s\nReason of error: %s\n", fileName, strerror(errno));
-        return ERROR_CODE;
-    }
-
-
-    return SAFE_EXIT_CODE;
+    return errorFlag;
 }
 
 
 
 /* Function to read information from file */
-int ScanFileHeader(char fileName[], struct ImageFileHeader *ifhPtr) {
-    int file = ZERO;
-    int status = ZERO;
+int ScanHeaderAndDirectory(int fileDescriptor, struct ImageFileHeader *ifhPtr, struct ImageFileDirectory *ifdPtr) {
     int byteCount = ZERO;
-    int flag = TRUE;
+    int errorFlag = FALSE;
+    int i;
 
-
-    /* Opening file to read */
-    file = open(fileName, O_RDONLY);
-    if (file == ERROR_CODE) {
-        fprintf(stderr, "\nError!\nCouldn't open file to scan file header: %s\nReason of error: %s\n", fileName, strerror(errno));
-        return ERROR_CODE;
-    }
     
     /* Reading file header informations to IFH pointer */
-    byteCount = read(file, &(ifhPtr->byteOrder), sizeof(ifhPtr->byteOrder));
-    if (byteCount == ERROR_CODE || byteCount == ZERO) {
-        fprintf (stderr, "\nError!\nEither end of file reached or an error has occured during reading byte order from file header: %s\nReason of error: %s\n", fileName, strerror(errno));
-        flag = FALSE;
-    }
-    
-    if (flag) {
-        byteCount = read(file, &(ifhPtr->tiffVersion), sizeof(ifhPtr->tiffVersion));
-        if (byteCount == ERROR_CODE || byteCount == ZERO) {
-            fprintf (stderr, "\nError!\nEither end of file reached or an error has occured during reading tiff version from file header: %s\nReason of error: %s\n", fileName, strerror(errno));
-            flag = FALSE;
-        }   
+    byteCount = read(fileDescriptor, ifhPtr, sizeof(*ifhPtr));
+    if (byteCount == ERROR_CODE || byteCount != SIZE_FILE_HEADER) {
+        fprintf (stderr, "\nError!\nEither end of file reached or an error has occured during reading file header\nReason of error: %s\n", strerror(errno));
+        errorFlag = TRUE;
     }
 
-    if (flag) {
-        byteCount = read(file, &(ifhPtr->ifdOffset), sizeof(ifhPtr->ifdOffset));
-        if (byteCount == ERROR_CODE || byteCount == ZERO) {
-            fprintf (stderr, "\nError!\nEither end of file reached or an error has occured during reading ifd offset from file header: %s\nReason of error: %s\n", fileName, strerror(errno));
-            flag = FALSE;
-        }   
-    }
-    
-    /* Closing file */
-    status = close(file);
-    if (status == ERROR_CODE ) {
-        fprintf(stderr, "\nError!\nCouldn't close file after file header scan: %s\nReason of error: %s\n", fileName, strerror(errno));
-        return ERROR_CODE;
-    }
-    
-
-    /* Return error code if an error occured during reading */
-    if (!flag) {
-        return ERROR_CODE;
+    /* Changing file cursor position to first IFD offset */
+    if (!errorFlag) {
+        if (lseek(fileDescriptor, ifhPtr->ifdOffset, SEEK_SET) == ERROR_CODE) {
+            fprintf(stderr, "\nError!\nCouldn't change the cursor position to IFD offset\nReason of error: %s\n", strerror(errno));
+            errorFlag = TRUE;
+        }
     }
 
+    /* Reading number of tags from directory */
+    if (!errorFlag) {
+        byteCount = read(fileDescriptor, &(ifdPtr->tagCount), sizeof(ifdPtr->tagCount));
+        if (byteCount == ERROR_CODE || byteCount != SIZE_TAG_COUNT) {
+            fprintf (stderr, "\nError!\nEither end of file reached or an error has occured during reading number of tags\nReason of error: %s\n", strerror(errno));
+            errorFlag = TRUE;
+        }
+    }
 
-    return SAFE_EXIT_CODE;
+    /* Allocating memory for the image tags */
+    if (!errorFlag) {
+        ifdPtr->tags = (struct TiffTag*)calloc(ifdPtr->tagCount, sizeof(struct TiffTag));
+        if (ifdPtr->tags == NULL) {
+            fprintf (stderr, "\nError!\nMemory allocation for image tags are failed\n");
+            errorFlag = TRUE;
+        }
+    }
+
+    /* Reading provided number of tags to allocated memory */
+    if (!errorFlag) {
+        for (i=0; i<ifdPtr->tagCount && !errorFlag; ++i) {
+            byteCount = read(fileDescriptor, (ifdPtr->tags)+i, sizeof(struct TiffTag));
+            if (byteCount == ERROR_CODE || byteCount != SIZE_TAG) {
+                fprintf (stderr, "\nError!\nEither end of file reached or an error has occured during readingasd number of tags\nReason of error: %s\n", strerror(errno));
+                errorFlag = TRUE;
+            }
+        }
+    }
+
+
+    return errorFlag;
 }
 
 
 
-/* Function to read image file directory from file */
-int ScanFileDirectory(char fileName[], struct ImageFileHeader ifh, int *pixelWidth, int *pixelHeight, int *layerCount) {
+/* Function to read image data and load to 2D array */
+int ScanImageBitmap(int fileDescriptor, struct ImageFileDirectory ifd, int ***bitmapArray) {
+    struct TiffTag currentTag;
+    unsigned int valueOfTag;
+    unsigned int imageLength;
+    unsigned int imageWidth;
+    unsigned int rowsPerStrip;
+    unsigned int stripOffsets;
+    unsigned int stripByteCounts;
+    unsigned int bitmapData;
+    off_t currentCursor;
+    int stripsPerImage;
     int i;
-    int file;
-    int status;
-    int flag = TRUE;
-    unsigned short tagCount;
-    unsigned int nextIfd;
-    struct ImageFileDirectory ifd;
+    char character;
 
-    memset(&ifd, ZERO, sizeof(ifd));
 
-    /* Opening file to read */
-    file = open(fileName, O_RDONLY);
-    if (file == ERROR_CODE) {
-        fprintf(stderr, "\nError!\nCouldn't open file to scan file directory: %s\nReason of error: %s\n", fileName, strerror(errno));
-        return ERROR_CODE;
+    for (i=0; i<ifd.tagCount; ++i) {
+        currentTag = ifd.tags[i];
+        if (currentTag.dataCount * GetByteCountByDataType(currentTag.dataType) <= FOUR_BYTES) {
+            valueOfTag = currentTag.dataOffset;
+        }
+
+        else {
+            /* TODO: Error Check */
+            currentCursor = lseek(fileDescriptor, ZERO, SEEK_CUR);
+            lseek(fileDescriptor, currentTag.dataOffset, SEEK_SET);
+            read(fileDescriptor, &valueOfTag, sizeof(valueOfTag));    
+            lseek(fileDescriptor, currentCursor, SEEK_SET);
+        }
+
+
+        switch (currentTag.tagID) {
+            case TAG_IMAGE_PIXEL_WIDTH:
+                imageWidth = valueOfTag;
+                break;
+            
+            case TAG_IMAGE_PIXEL_LENGTH:
+                imageLength = valueOfTag;
+                break;
+
+            case TAG_ROWS_PER_STRIP:
+                DebugPrintTag(currentTag);
+                rowsPerStrip = valueOfTag;
+                break;
+            
+            case TAG_STRIP_OFFSETS:
+                DebugPrintTag(currentTag);
+                stripOffsets = valueOfTag;
+                break;
+            
+            case TAG_STRIP_BYTE_COUNTS:
+                DebugPrintTag(currentTag);
+                stripByteCounts = valueOfTag;
+                break;
+
+            default:
+                break;
+        }
     }
 
-    /*ifh.ifdOffset = (ifh.ifdOffset >> 8) || (ifh.ifdOffset << 8);*/
+    /* Formula to find strips per image, taken from tiff documentation itself */
+    stripsPerImage = (int)((imageLength + rowsPerStrip -1) / rowsPerStrip);
+    printf("Image Length: %d\nImage Width: %d\nRows P Strip: %d\nStrips P Image: %d\nStrip Offsets: %d\nStrip Byte Counts: %d\n", imageLength, imageWidth, rowsPerStrip, stripsPerImage, stripOffsets, stripByteCounts);
 
-    /* Changing file cursor position to IFD offset */
-    if (lseek(file, ifh.ifdOffset, SEEK_SET) == ERROR_CODE) {
-        fprintf(stderr, "\nError!\nCouldn't change the cursor position to IFD offset for file: %s\nReason of error: %s\n", fileName, strerror(errno));
-        flag = FALSE;
-    }
-
-    read(file, &tagCount, sizeof(tagCount));
     
-    for (i=0; i<tagCount; ++i) {
-        read(file, &ifd, sizeof(ifd));
-        printf("Tag ID: %d\nData Type: %d\nData Count: %d\nData Offset: %d\n\n", ifd.tagID, ifd.dataType, ifd.dataCount, ifd.dataOffset);
-    }
-
-    read (file, &nextIfd, sizeof(nextIfd));
-    printf("Current offset: %d\nNext IFD offset: %d\n", lseek(file, 0, SEEK_CUR), nextIfd);
-
-    /* Closing file */
-    status = close(file);
-    if (status == ERROR_CODE ) {
-        fprintf(stderr, "\nError!\nCouldn't close file after file directory scan: %s\nReason of error: %s\n", fileName, strerror(errno));
-        return ERROR_CODE;
-    }
+    return 0;
+}
 
 
-    return SAFE_EXIT_CODE;
+
+/* Function to deallocate memory and close descriptors */
+void ClearMemoryAllocations(void *param, ...) {
+    /* TODO: deallocate dynamically allocated variables
+             close descriptors
+    */
 }
 
 
@@ -277,4 +237,26 @@ char *GetFileExtension(char fileName[]) {
     char *dot = strrchr(fileName, '.');
     if(!dot || dot == fileName) return "";
     return dot + 1;
+}
+
+
+int GetByteCountByDataType(unsigned short type) {
+    switch (type) {
+        case TAG_TYPE_3:
+            return sizeof(unsigned short);
+        
+        case TAG_TYPE_4:
+            return sizeof(unsigned int);
+
+        default:
+            break;
+    }
+
+    return ERROR_CODE;
+}
+
+
+
+void DebugPrintTag(struct TiffTag tag) {
+    printf("Tag ID: %d\nData Type: %d\nData Count: %d\nData Offset: %d\n\n", tag.tagID, tag.dataType, tag.dataCount, tag.dataOffset);
 }
