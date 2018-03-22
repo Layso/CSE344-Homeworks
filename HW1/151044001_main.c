@@ -54,7 +54,6 @@ int ScanAndPrint(char fileName[]) {
 
 /* Function to check if file exists and safe to read */
 int CheckTiffFile(char fileName[], int *fileDescriptor, struct ImageFileHeader *ifhPtr, int *swapByteOrder) {
-    int status;
     int byteCount = ZERO;
     int errorFlag = FALSE;
 
@@ -147,22 +146,24 @@ int ScanFileDirectory(int fileDescriptor, struct ImageFileHeader *ifhPtr, struct
             }
             
             if (*byteOrderStatus) {
-               /* printf("ID: %d\n", ifdPtr->tags[i].tagID);
-                printf("Type: %d\n", ifdPtr->tags[i].dataType);
-                printf("Count: %d\n", ifdPtr->tags[i].dataCount);
-                printf("Offset: %d\n\n", ifdPtr->tags[i].dataOffset);
-*/
+                /*
+                printf("ID:     %04x\n", ifdPtr->tags[i].tagID);
+                printf("Type:   %04x\n", ifdPtr->tags[i].dataType);
+                printf("Count:  %08x\n", ifdPtr->tags[i].dataCount);
+                printf("Offset: %08x\n\n", ifdPtr->tags[i].dataOffset);
+                */
 
                 Swap2Bytes(&ifdPtr->tags[i].tagID);
                 Swap2Bytes(&ifdPtr->tags[i].dataType);
                 Swap4Bytes(&ifdPtr->tags[i].dataCount);
                 Swap4Bytes(&ifdPtr->tags[i].dataOffset);
 
-/*
-                printf("ID: %d\n", ifdPtr->tags[i].tagID);
-                printf("Type: %d\n", ifdPtr->tags[i].dataType);
-                printf("Count: %d\n", ifdPtr->tags[i].dataCount);
-                printf("Offset: %d\n\n\n", ifdPtr->tags[i].dataOffset);*/
+                /*
+                printf("ID:     %04x\n", ifdPtr->tags[i].tagID);
+                printf("Type:   %04x\n", ifdPtr->tags[i].dataType);
+                printf("Count:  %08x\n", ifdPtr->tags[i].dataCount);
+                printf("Offset: %08x\n\n\n\n\n\n", ifdPtr->tags[i].dataOffset);
+                */
             }
         }
     }
@@ -181,13 +182,9 @@ int ScanImageBitmap(int fileDescriptor, struct ImageFileDirectory ifd, int byteO
     unsigned int *offsetBytes = NULL;
     unsigned int compression;
     unsigned int offsetCount;
-    unsigned int rowsPerStrip;
     unsigned int bitsPerSample;
     unsigned int samplePerPixel = 1;
     unsigned char *strips = NULL;
-    unsigned char oneBit;
-    unsigned short unsignedShort;
-    unsigned int unsignedInt;
     int imageLength;
     int imageWidth;
     int index;
@@ -198,14 +195,12 @@ int ScanImageBitmap(int fileDescriptor, struct ImageFileDirectory ifd, int byteO
     int status;
     int errorFlag = FALSE;
     int i, j;
-    int dataSize;
 
 
     /* Reading data from tags */
     for (i=0; i<ifd.tagCount && !errorFlag; ++i) {
         tag = ifd.tags[i];
         data = (unsigned int*)calloc(tag.dataCount, GetByteCountByDataType(tag.dataType));
-
         switch (tag.tagID) {
             case TAG_IMAGE_PIXEL_LENGTH:
                 errorFlag = ReadFieldData(fileDescriptor, tag, byteOrderStatus, data);
@@ -232,6 +227,7 @@ int ScanImageBitmap(int fileDescriptor, struct ImageFileDirectory ifd, int byteO
                 break;
 
             case TAG_COMPRESSION_TYPE: 
+                DebugPrintTag(tag);
                 errorFlag = ReadFieldData(fileDescriptor, tag, byteOrderStatus, data);
                 if (errorFlag) {
                     fprintf (stderr, "\nError!\nCouldn't read tag value from file\nTag number: %d\n", tag.tagID);
@@ -319,7 +315,7 @@ int ScanImageBitmap(int fileDescriptor, struct ImageFileDirectory ifd, int byteO
 
     /* Checking compression */
     if (compression != NO_COMPRESSION) {
-        printf("\nError!\nThis reader (unfortunately) does not support compressed image data\n");
+        printf("\nError!\nThis reader (unfortunately) does not support compressed image data: %d\n", compression);
         errorFlag = TRUE;
     }
 
@@ -413,8 +409,6 @@ int ReadFieldData(int fileDescriptor, struct TiffTag tag, int byteOrderStatus, u
     int byteCount;
     int status;
     int i;
-    unsigned int buffer4Byte;
-    unsigned short buffer2Byte;
     unsigned int buffer;
 
 
@@ -549,5 +543,5 @@ void Swap4Bytes(unsigned int *num) {
 
 
 void DebugPrintTag(struct TiffTag tag) {
-    printf("Tag ID: %x\nData Type: %x\nData Count: %x\nData Offset: %x\n\n", tag.tagID, tag.dataType, tag.dataCount, tag.dataOffset);
+    printf("Tag ID: %x\nData Type: %x\nData Count: %x\nData Offset: %08x\n\n", tag.tagID, tag.dataType, tag.dataCount, tag.dataOffset);
 }
