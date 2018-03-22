@@ -15,11 +15,12 @@ dev: clean compile link run
 # 2 Runs the executable with valgrind instead of directly running it
 val: clean compile link runValgrind
 
+# Same as dev but without error checks for faster development
 devwo:clean compilewo link run
 
 
 # Variable to give as command line argument. Holds the image path
-fileName = ./Images/smileyGreyLayers.tif
+fileName = ./Images/TEST.TIF
 
 
 

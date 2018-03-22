@@ -31,16 +31,30 @@
 #define MOTOROLA_BYTE_ORDER "MM"
 #define TAG_IMAGE_PIXEL_WIDTH 256
 #define TAG_IMAGE_PIXEL_LENGTH 257
+#define TAG_BITS_PER_SAMPLE 258
 #define TAG_COMPRESSION_TYPE 259
+#define TAG_PHOTOMETRIC_INTERPRETATION 262
 #define TAG_STRIP_OFFSETS 273
+#define TAG_SAMPLE_PER_PIXEL 277
 #define TAG_ROWS_PER_STRIP 278
 #define TAG_STRIP_BYTE_COUNTS 279
 #define SIZE_FILE_HEADER 8
 #define SIZE_TAG_COUNT 2
 #define SIZE_TAG 12
+#define TAG_TYPE_1 1
+#define TAG_TYPE_2 2
 #define TAG_TYPE_3 3
 #define TAG_TYPE_4 4
+#define TAG_TYPE_5 5
 #define FOUR_BYTES 4
+#define REQUIRED_COMPRESSION 1
+#define LITTLE_ENDIAN 0
+#define BIG_ENDIAN 1
+#define SIZE_BYTE 8
+#define WHITE 1
+#define BLACK 0
+#define MEANING_OF_LIFE 42
+#define NO_COMPRESSION 1
 
 
 
@@ -77,13 +91,15 @@ struct ImageInformations {
 
 /* Function prototype(s) */
 int ScanAndPrint(char fileName[]);
-int CheckTiffFile(char fileName[], int *fileDescriptor);
-int ScanHeaderAndDirectory(int fileDescriptor, struct ImageFileHeader *ifhPtr, struct ImageFileDirectory *ifdPtr);
-int ScanImageBitmap(int fileDescriptor, struct ImageFileDirectory ifd, int ***bitmapArray);
-void ClearMemoryAllocations(void *, ...);
-
+int CheckTiffFile(char fileName[], int *fileDescriptor, struct ImageFileHeader *ifhPtr, int *swapByteOrder);
+int ScanFileDirectory(int fileDescriptor, struct ImageFileHeader *ifhPtr, struct ImageFileDirectory *ifdPtr, int *byteOrderStatus);
+int ScanImageBitmap(int fileDescriptor, struct ImageFileDirectory ifd, int byteOrderStatus);
+int ReadFieldData(int fileDescriptor, struct TiffTag tag, int byteOrderStatus, unsigned int *data);
+int GetEndiannessByType(unsigned short type);
 int GetByteCountByDataType(unsigned short type);
-char *GetFileExtension(char fileName[]);
+int GetEndianness();
 
+void Swap2Bytes(unsigned short *num);
+void Swap4Bytes(unsigned int *num);
 void DebugPrintTag(struct TiffTag tag);
-
+void PrintByteByBits(unsigned char byte);
