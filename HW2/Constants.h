@@ -1,0 +1,22 @@
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
+
+#define ZERO 0
+#define TRUE 1
+#define FALSE 0
+#define ERROR_CODE -1
+#define EMPTY_STRING ""
+#define NEW_LINE_CHARACTER "\n"
+#define NULL_CHARACTER "\n"
+#define REQUIRED_ARGC 7
+#define ARGUMENT_SEQUENCE_LENGTH_C "-N"
+#define ARGUMENT_SEQUENCE_LENGTH_L "-n"
+#define ARGUMENT_MAXIMUM_NUMBER_C "-M"
+#define ARGUMENT_MAXIMUM_NUMBER_L "-m"
+#define ARGUMENT_FILE_NAME_C "-X"
+#define ARGUMENT_FILE_NAME_L "-x"
+#define REAL_NUMBER_MAX 100
+#define REAL_NUMBER_CONSTANT 10
+#define FILE_PERMISSONS 0777
+
+#endif

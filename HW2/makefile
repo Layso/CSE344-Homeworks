@@ -8,10 +8,10 @@ X = file.dat
 all: leysö run
 
 compile:
-	gcc -c 151044001_main.c -ansi -Wall -pedantic -errors
+	gcc -c 151044001_main.c ParentHelpers.c ChildHelpers.c -ansi -Wall -pedantic -errors
 	
 link:
-	gcc -o multiprocess_DFT 151044001_main.o
+	gcc -o multiprocess_DFT 151044001_main.o ParentHelpers.o ChildHelpers.o
 
 run:
 	./multiprocess_DFT -N $(N) -X $(X) -M $(M)

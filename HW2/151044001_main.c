@@ -1,36 +1,19 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include "main.h"
-
-
-
-#define ZERO 0
-#define TRUE 1
-#define FALSE 0
-#define ERROR_CODE -1
-#define EMPTY_STRING ""
-#define NEW_LINE_CHARACTER "\n"
-#define NULL_CHARACTER "\n"
-#define REQUIRED_ARGC 7
-#define ARGUMENT_SEQUENCE_LENGTH_C "-N"
-#define ARGUMENT_SEQUENCE_LENGTH_L "-n"
-#define ARGUMENT_MAXIMUM_NUMBER_C "-M"
-#define ARGUMENT_MAXIMUM_NUMBER_L "-m"
-#define ARGUMENT_FILE_NAME_C "-X"
-#define ARGUMENT_FILE_NAME_L "-x"
+#include "151044001_main.h"
+#include "ParentHelpers.h"
+#include "ChildHelpers.h"
 
 
 
 int main(int argc, char *argv[]) {
+	int i;
+	int M;
+	int N;
+	int status;
+	int fileDescriptor;
+	struct stat fileStruct;
 	pid_t childPID;
 	char *X;
-	int N;
-	int M;
-	int i;
+	
 	
 	/* Argument count check to print usage */
 	if (argc != REQUIRED_ARGC) {
@@ -58,6 +41,35 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 	
+	/* Preparing communication file and random seed */
+	srand(time(NULL));
+	
+	
+	status = stat(X, &fileStruct);
+	if (status == ERROR_CODE) {
+		if (errno == ENOENT) {
+			fileDescriptor = open(X, O_CREAT, 0777);
+			if (fileDescriptor == ERROR_CODE) {
+				fprintf(stderr, "\nSystem Error!\nCommunication file couldn't created: '%s'\nError message: %s\n", X, strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+		}
+		
+		else {
+			fprintf(stderr, "\nSystem Error!\nCommunication file existance couldn't checked: '%s'\nError message: %s\n", X, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
+	
+	else {
+		fprintf(stderr, "\nError!\nCommunication file already exists\nAn instance of this program might be already running\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	
+	close (fileDescriptor);
+	
+	
 	/* Transform to multiprocess */
 	childPID = fork();
 	switch(childPID) {
@@ -83,7 +95,10 @@ int main(int argc, char *argv[]) {
 
 /* Starter function for parent process AKA process A */
 void ParentFunction(char fileName[], int maximum, int numberCount, pid_t childPID) {
-	 printf("Process A: Ehe\n");
+	 double *sequence = NULL;
+	 
+	 ProduceSequence(numberCount, &sequence);
+	 WriteToFile(fileName, numberCount, sequence, maximum);
 	 
 	 /* TODO
 	  * 
