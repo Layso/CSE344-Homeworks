@@ -2,7 +2,9 @@
 *.o
 
 # Executable file created from linking Object files
-exe
+**/exe
+**/multiprocess_DFT
+**/tiffProcessor
 
 # TIFF image files
 *.tif
@@ -10,3 +12,6 @@ exe
 *.TIFF
 *.TIF
 *.xcf
+
+# Visual Code related files/folders
+**/.vscode
