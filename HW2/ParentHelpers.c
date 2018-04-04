@@ -24,13 +24,6 @@ void ProduceSequence(int n, double **sequence) {
 
 
 /*  */
-void WriteToFile(char fileName[], int n, double *sequence, int maximumLines) {
-	int i;
-	int fileDescriptor;
+void WriteToFile(int fileDescriptor, int n, double *sequence, int maximumLines) {
 	
-	
-	fileDescriptor = open(fileName, O_WRONLY | O_APPEND);
-	for (i=0; i<n; ++i) {
-		write(fileDescriptor, &sequence[i], sizeof(double));
-	}
 }

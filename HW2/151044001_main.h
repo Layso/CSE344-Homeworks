@@ -18,7 +18,7 @@
 void ParentFunction(char fileName[], int maximum, int numberCount, pid_t childPID);
 void ChildFunction(char fileName[], int numberCount);
 int CountSequence(char fileName[], int itemCount, int itemSize);
-
+void Logger(char fileName[], char message[]);
 
 
 #endif

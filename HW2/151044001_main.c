@@ -98,27 +98,38 @@ int main(int argc, char *argv[]) {
 
 /* Starter function for parent process AKA process A */
 void ParentFunction(char fileName[], int maximum, int numberCount, pid_t childPID) {
-	 double *sequence = NULL;
-	 int currentSequenceCount;
-	 
-	 
-	 while (parentCanContinue) {
-		ProduceSequence(numberCount, &sequence);
-		currentSequenceCount = CountSequence(fileName, numberCount, sizeof(double));
+	int fileDescriptor;
+	int currentSequenceCount;
+	double *sequence = NULL;
+	struct flock lockStruct;
+	
+	
+	/* Acquire a lock on file for writing */
+	memset(&lockStruct, ZERO, sizeof(struct flock));
+	lockStruct.l_type = F_WRLCK;
+	
+	
+	
+	ProduceSequence(numberCount, &sequence);
+	currentSequenceCount = CountSequence(fileName, numberCount, sizeof(double));
+	
+	
+	if (currentSequenceCount == maximum) {
+		parentCanContinue = FALSE;	
+	}
+	
+	else {
 		
-		
-		if (currentSequenceCount == ZERO) {
-			
-		}
-		
-		else if (currentSequenceCount == maximum) {
-			parentCanContinue = FALSE;	
-		}
-		
-		else {
-			WriteToFile(fileName, numberCount, sequence, maximum);
-		}
-	 }
+		fileDescriptor = open(fileName, O_WRONLY | O_APPEND);
+		printf("File lock parent stat: %d\n", fcntl(fileDescriptor, F_SETLKW, &lockStruct));
+		perror("niye");
+		WriteToFile(fileDescriptor, numberCount, sequence, maximum);
+		sleep(15);
+		close(fileDescriptor);
+	}
+	
+	
+	
 	 /* TODO
 	  * 
 	  * Produce a sequence
@@ -132,24 +143,27 @@ void ParentFunction(char fileName[], int maximum, int numberCount, pid_t childPI
 
 
 void ChildHandler(int signal) {
-	childCanCountinue = 5;
+	childCanCountinue = 1;
 }
 
 /* Starter function for child process AKA process B */
 void ChildFunction(char fileName[], int numberCount) {
-	struct sigaction sigAction;
-	sigset_t sigSet;
-	
-	memset(&sigAction, ZERO, sizeof(struct sigaction));
-	memset(&sigSet, ZERO, sizeof(sigSet));
-	sigAction.sa_handler = ChildHandler;
+	int fileDescriptor;
+	int currentSequenceCount;
+	double *sequence = NULL;
+	struct flock lockStruct;
 	
 	
-	sigaction(SIGUSR1, &sigAction, NULL);
-	sigfillset(&sigSet);
-	sigdelset(&sigSet, SIGUSR2);
-	/*sigsuspend(&sigSet);*/
+	/* Acquire a lock on file for writing */
+	memset(&lockStruct, ZERO, sizeof(struct flock));
+	lockStruct.l_type = F_RDLCK;
 	
+	sleep(2);
+	fileDescriptor = open(fileName, O_RDONLY);
+	printf("File lock child stat: %d\n", fcntl(fileDescriptor, F_SETLKW, &lockStruct));
+	printf("I locked it\n");
+	close(fileDescriptor);
+	printf("I'm done\n");
 	
 	/* TODO
 	 *
@@ -173,4 +187,11 @@ int CountSequence(char fileName[], int itemCount, int itemSize) {
 	
 	fileSize = fileStat.st_size;
 	return fileSize/(itemSize*itemCount);
+}
+
+
+
+void Logger(char fileName[], char message[]) {
+	int file = open(fileName, O_WRONLY | O_APPEND | O_CREAT, 0777);
+	write(file, message, strlen(message));
 }
