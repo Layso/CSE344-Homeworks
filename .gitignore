@@ -6,12 +6,13 @@
 **/multiprocess_DFT
 **/tiffProcessor
 
-# TIFF image files
+# Data files
 *.tif
 *.tiff
 *.TIFF
 *.TIF
 *.xcf
+*.dat
 
 # Visual Code related files/folders
 **/.vscode
