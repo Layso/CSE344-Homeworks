@@ -26,12 +26,11 @@ void ProduceSequence(int n, double **sequence) {
 /*  */
 void WriteToFile(char fileName[], int n, double *sequence, int maximumLines) {
 	int i;
+	int fileDescriptor;
 	
 	
-	printf("Writing sequence to file '%s'\n", fileName);
+	fileDescriptor = open(fileName, O_WRONLY | O_APPEND);
 	for (i=0; i<n; ++i) {
-		printf("%f ", sequence[i]);
+		write(fileDescriptor, &sequence[i], sizeof(double));
 	}
-	printf("\n");
-	
 }
