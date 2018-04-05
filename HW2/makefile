@@ -1,8 +1,8 @@
 leysö: compile link 
 
-N = 5
-M = 100
-X = file.dat
+N = 10
+M = 50
+X = fileawd.dat
 
 all: clean leysö run
 

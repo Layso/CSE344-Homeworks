@@ -201,7 +201,6 @@ void ParentFunction(char fileName[], int maximum, int itemCount, pid_t childPID)
 		sigpending(&pendingSet);
 		if (sigismember(&pendingSet, SIGINT)) {
 			exitFlag = TRUE;
-			printf("Parent ending\n");
 			kill(childPID, SIGINT);
 		}
 	}
@@ -325,7 +324,6 @@ void ChildFunction(char fileName[], int maximum, int itemCount) {
 		sigpending(&pendingSet);
 		if (sigismember(&pendingSet, SIGINT)) {
 			exitFlag = TRUE;
-			printf("Child ending\n");
 		}
 	}
 	
