@@ -15,12 +15,10 @@
 
 
 
-void ParentFunction(char fileName[], int maximum, int numberCount, pid_t childPID);
-void ChildFunction(char fileName[], int numberCount);
+void ParentFunction(char fileName[], int maximum, int itemCount, pid_t childPID);
+void ChildFunction(char fileName[], int maximum, int itemCount);
 void EmptyHandler(int signal);
 void ChildHandler(int signal);
 int CountSequence(char fileName[], int itemCount, int itemSize);
-void Logger(char fileName[], char message[]);
-
 
 #endif
