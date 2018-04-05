@@ -209,7 +209,6 @@ void ParentFunction(char fileName[], int maximum, int itemCount, pid_t childPID)
 	
 	/* Wait for child and clean file */
 	wait(NULL);
-	printf("Child terminated, delete file\n");
 	if (remove(fileName) == ERROR_CODE) {
 		fprintf(stderr, "\nSystem Error!\nCommunication file couldn't removed by process A: '%s'\nError message: %s\n", fileName, strerror(errno));
 	}

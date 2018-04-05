@@ -15,6 +15,9 @@ link:
 run:
 	./multiprocess_DFT -N $(N) -X $(X) -M $(M)
 
+runValgrind:
+	valgrind ./multiprocess_DFT -N $(N) -X $(X) -M $(M)
+
 clean:
 	rm -f *.o multiprocess_DFT
 	clear
