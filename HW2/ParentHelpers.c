@@ -24,6 +24,16 @@ void ProduceSequence(int n, double **sequence) {
 
 
 /*  */
-void WriteToFile(int fileDescriptor, int n, double *sequence, int maximumLines) {
+void WriteToFile(int fileDescriptor, int n, double *sequence) {
+	int i;
+	size_t byteCount;
 	
+	
+	for (i = 0; i<n; ++i) {
+		byteCount = write(fileDescriptor, &sequence[i], sizeof(double));
+		if (byteCount != sizeof(double)) {
+			fprintf(stderr, "\nError!\nCouldn't write sequence element to file\n");
+			raise(SIGINT);
+		}
+	}
 }

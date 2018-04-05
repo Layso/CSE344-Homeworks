@@ -4,8 +4,9 @@
 
 
 
-int childCanCountinue;
-int parentCanContinue;
+int exitFlag;
+
+
 
 int main(int argc, char *argv[]) {
 	int i;
@@ -46,8 +47,7 @@ int main(int argc, char *argv[]) {
 	
 	/* Seeding random and initializing variables */
 	srand(time(NULL));
-	childCanCountinue = FALSE;
-	parentCanContinue = TRUE;
+	exitFlag = FALSE;
 	
 	/* Checking file existance, quit if exists, create if doesn't */
 	fileDescriptor = open(X, O_CREAT/* | O_EXCL*/, FILE_PERMISSONS);
@@ -99,34 +99,76 @@ int main(int argc, char *argv[]) {
 /* Starter function for parent process AKA process A */
 void ParentFunction(char fileName[], int maximum, int numberCount, pid_t childPID) {
 	int fileDescriptor;
-	int currentSequenceCount;
-	double *sequence = NULL;
+	double *sequence;
 	struct flock lockStruct;
+	struct sigaction sigAction;
+	sigset_t maskSet, pendingSet;
 	
 	
-	/* Acquire a lock on file for writing */
+	/* Clear structs */
+	memset(&maskSet, ZERO, sizeof(sigset_t));
+	memset(&pendingSet, ZERO, sizeof(sigset_t));
+	memset(&sigAction, ZERO, sizeof(struct sigaction));
 	memset(&lockStruct, ZERO, sizeof(struct flock));
 	lockStruct.l_type = F_WRLCK;
 	
 	
+	/* Assign a handler to prevent program shut down on arrival */ 
+	sigAction.sa_handler = EmptyHandler;
+	sigaction(SIGUSR1, &sigAction, NULL);
 	
-	ProduceSequence(numberCount, &sequence);
-	currentSequenceCount = CountSequence(fileName, numberCount, sizeof(double));
+	/* Prepare a mask that excludes communication signal */
+	sigprocmask(SIG_SETMASK, NULL, &maskSet);
+	sigdelset(&maskSet, SIGUSR1);
+	
+	/* Send signal to indicate parent is ready then wait for child to be ready */
+	kill(childPID, SIGUSR1);
+	sigsuspend(&maskSet);
+	
+	
+	/* Endless race (until SIGINT arrives) can start now */
+	while(!exitFlag) {
+		
+		if (CountSequence(fileName, numberCount, sizeof(double)) < maximum) {
+			fileDescriptor = open(fileName, O_WRONLY | O_APPEND);
+			ProduceSequence(numberCount, &sequence);
+			WriteToFile(fileDescriptor, numberCount, sequence);
+			close(fileDescriptor);
+		}
+		/* Check if SIGINT arrived to end process */
+		sigpending(&pendingSet);
+		if (sigismember(&pendingSet, SIGINT)) {
+			exitFlag = TRUE;
+			printf("Parent ending\n");
+			kill(childPID, SIGINT);
+		}
+	}
+	
+	/* Ready the sequence just in case */
+	/*
+		
+	int currentSequenceCount;
+	double *sequence = NULL;
+	struct flock lockStruct;
+	lockStruct.l_type = F_WRLCK;
+	memset(&lockStruct, ZERO, sizeof(struct flock));
+		ProduceSequence(numberCount, &sequence);
+		fileDescriptor = open(fileName, O_WRONLY | O_APPEND);
+		fcntl(fileDescriptor, F_SETLKW, &lockStruct);
+		currentSequenceCount = CountSequence(fileName, numberCount, sizeof(double));
+		printf("Parent processing\n");
+		sleep(1);
+	
 	
 	
 	if (currentSequenceCount == maximum) {
-		parentCanContinue = FALSE;	
+		sigsuspend(SIGUSR1);
 	}
 	
 	else {
-		
-		fileDescriptor = open(fileName, O_WRONLY | O_APPEND);
-		printf("File lock parent stat: %d\n", fcntl(fileDescriptor, F_SETLKW, &lockStruct));
-		perror("niye");
-		WriteToFile(fileDescriptor, numberCount, sequence, maximum);
-		sleep(15);
+		WriteToFile(fileDescriptor, numberCount, sequence);
 		close(fileDescriptor);
-	}
+	}*/
 	
 	
 	
@@ -142,21 +184,72 @@ void ParentFunction(char fileName[], int maximum, int numberCount, pid_t childPI
 }
 
 
-void ChildHandler(int signal) {
-	childCanCountinue = 1;
-}
 
 /* Starter function for child process AKA process B */
 void ChildFunction(char fileName[], int numberCount) {
+	sigset_t maskSet, pendingSet;
+	struct sigaction sigAction;
+	
+	
+	/* Clear structs */
+	memset(&maskSet, ZERO, sizeof(sigset_t));
+	memset(&pendingSet, ZERO, sizeof(sigset_t));
+	memset(&sigAction, ZERO, sizeof(struct sigaction));
+	
+	
+	/* Assign a handler to prevent program shut down on arrival */
+	sigAction.sa_handler = EmptyHandler;
+	sigaction(SIGUSR1, &sigAction, NULL);
+	
+	/* Prepare a mask that excludes communication signal */
+	sigprocmask(SIG_SETMASK, NULL, &maskSet);
+	sigdelset(&maskSet, SIGUSR1);
+	
+	/* Wait for parent to be ready, then send signal to indicate child is ready */
+	sigsuspend(&maskSet);
+	kill(getppid(), SIGUSR1);
+	
+	
+	/* Endless race (until SIGINT arrives) can start now */
+	while(!exitFlag) {
+		int count = CountSequence(fileName, numberCount, sizeof(double));
+		
+		if (count < 100) {
+			printf("Child counts %d lines\n", count);
+			
+		}
+		
+		/* Check if SIGINT arrived to end process */
+		sigpending(&pendingSet);
+		if (sigismember(&pendingSet, SIGINT)) {
+			exitFlag = TRUE;
+			printf("Child ending\n");
+		}
+	}
+	
+	
+	/* Prepare synchroniastion by sending ready signal to child then suspend until child sends ready signal */
+	/*sigsuspend(&sigSet);
+	sleep(10);
+	kill(getppid(), SIGUSR2);
+	sigaddset(&sigSet, SIGUSR2);*/
+	
+	/*
+	
+	
 	int fileDescriptor;
 	int currentSequenceCount;
 	double *sequence = NULL;
 	struct flock lockStruct;
 	
 	
-	/* Acquire a lock on file for writing */
 	memset(&lockStruct, ZERO, sizeof(struct flock));
+	
+	
+	
+	
 	lockStruct.l_type = F_RDLCK;
+	
 	
 	sleep(2);
 	fileDescriptor = open(fileName, O_RDONLY);
@@ -164,7 +257,7 @@ void ChildFunction(char fileName[], int numberCount) {
 	printf("I locked it\n");
 	close(fileDescriptor);
 	printf("I'm done\n");
-	
+	*/
 	/* TODO
 	 *
 	 * Lock the file
@@ -178,6 +271,19 @@ void ChildFunction(char fileName[], int numberCount) {
 
 
 
+/*  */
+void EmptyHandler(int signal) {
+	switch(signal) {
+		case SIGUSR1: printf("SIGUSR1 arrived to %d\n", getpid()); break;
+		case SIGUSR2: printf("SIGUSR2 arrived to %d\n", getpid()); break;
+		case SIGINT: printf("SIGINT arrived to %d\n", getpid()); exitFlag = TRUE; break;
+		default: break;
+	}
+}
+
+
+
+/*  */
 int CountSequence(char fileName[], int itemCount, int itemSize) {
 	struct stat fileStat;
 	int fileSize;

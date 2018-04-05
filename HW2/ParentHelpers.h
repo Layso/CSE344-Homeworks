@@ -16,7 +16,7 @@
 
 /* Function definitions */
 void ProduceSequence(int n, double **sequence);
-void WriteToFile(int fileDescriptor, int n, double *sequence, int maximumLines);
+void WriteToFile(int fileDescriptor, int n, double *sequence);
 
 
 #endif
