@@ -23,11 +23,10 @@ void ProduceSequence(int n, double **sequence) {
 
 
 
-/*  */
+/* Write the sequence given by parameter to file */
 void WriteToFile(int fileDescriptor, int n, double *sequence) {
 	int i;
 	size_t byteCount;
-	struct flock lock;
 	
 	
 	for (i = 0; i<n; ++i) {
@@ -42,7 +41,7 @@ void WriteToFile(int fileDescriptor, int n, double *sequence) {
 
 
 
-/*  */
+/* Function to log parent operation */
 void ParentLogger(int line, int n, double *sequence) {
 	int i;
 	int fileDescriptor;
@@ -59,10 +58,10 @@ void ParentLogger(int line, int n, double *sequence) {
 	sprintf(string, "Process A: producing line %d :(", line);
 	for (i=0; i<n; ++i) {
 		if (i+1 < n)
-			sprintf(string+strlen(string), "%.2lf - ", sequence[i]);
+			sprintf(string+strlen(string), "%.2f - ", sequence[i]);
 	
 		else
-			sprintf(string+strlen(string), "%.2lf)\n", sequence[i]);
+			sprintf(string+strlen(string), "%.2f)\n", sequence[i]);
 	}
 	
 	/* Preparing logger file name */
@@ -72,6 +71,15 @@ void ParentLogger(int line, int n, double *sequence) {
 	/* Printing to both stdout and log file */
 	printf("%s", string);
 	fileDescriptor = open(loggerName, O_WRONLY | O_APPEND | O_CREAT, FILE_PERMISSONS);
-	write(fileDescriptor, string, strlen(string));
-	close(fileDescriptor);
+	if (fileDescriptor == ERROR_CODE) {
+		fprintf(stderr, "\nSystem Error! (Process still runs)\nLogger file couldn't opened by process A file for line %d: %s\nError message: %s\n", line, loggerName, strerror(errno));
+	}
+	
+	else {
+		if (write(fileDescriptor, string, strlen(string)) != strlen(string)) {
+			fprintf(stderr, "\nSystem Error! (Process still runs)\nProcess A couldn't write log message to log file for line %d: %s\nError message: %s\n", line, loggerName, strerror(errno));
+		}
+		
+		close(fileDescriptor);
+	}
 }

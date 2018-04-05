@@ -116,18 +116,40 @@ void ParentFunction(char fileName[], int maximum, int itemCount, pid_t childPID)
 	
 	/* Assign a handler to prevent program shut down on arrival */ 
 	sigAction.sa_handler = EmptyHandler;
-	sigaction(SIGUSR1, &sigAction, NULL);
+	if (sigaction(SIGUSR1, &sigAction, NULL) == ERROR_CODE && !exitFlag) {
+		fprintf(stderr, "\nSystem Error!\nSignal handler couldn't assigned by process A\nError message: %s\n", strerror(errno));
+		
+		/* Sending both signals to child due to unknown state of child signal mask process */
+		kill(childPID, SIGUSR1);
+		kill(childPID, SIGINT);
+		exitFlag = TRUE;
+	}
 	
 	/* Prepare a mask that excludes communication signal */
-	sigprocmask(SIG_SETMASK, NULL, &maskSet);
-	sigdelset(&maskSet, SIGUSR1);
+	if (sigprocmask(SIG_SETMASK, NULL, &maskSet) == ERROR_CODE && !exitFlag) {
+		fprintf(stderr, "\nSystem Error!\nSignal mask couldn't applied by process A\nError message: %s\n", strerror(errno));
+		kill(childPID, SIGUSR1);
+		kill(childPID, SIGINT);
+		exitFlag = TRUE;
+	}
+	
+	if (sigdelset(&maskSet, SIGUSR1) == ERROR_CODE && !exitFlag) {
+		fprintf(stderr, "\nSystem Error!\nSignal set couldn't changed by process A\nError message: %s\n", strerror(errno));
+		kill(childPID, SIGUSR1);
+		kill(childPID, SIGINT);
+		exitFlag = TRUE;
+	}
 	
 	/* Send signal to indicate parent is ready then wait for child to be ready */
 	kill(childPID, SIGUSR1);
-	sigsuspend(&maskSet);
+	if (sigsuspend(&maskSet) == ERROR_CODE && !exitFlag && errno != EINTR) {
+		fprintf(stderr, "\nSystem Error!\nProcess A couldn't suspended itself\nError message: %s\n", strerror(errno));
+		kill(childPID, SIGUSR1);
+		kill(childPID, SIGINT);
+		exitFlag = TRUE;
+	}
 	
 	
-	/*exitFlag = TRUE;*/
 	
 	/* Endless race (until SIGINT arrives) can start now */
 	while(!exitFlag) {
@@ -186,6 +208,11 @@ void ParentFunction(char fileName[], int maximum, int itemCount, pid_t childPID)
 	
 	
 	/* Wait for child and clean file */
+	wait(NULL);
+	printf("Child terminated, delete file\n");
+	if (remove(fileName) == ERROR_CODE) {
+		fprintf(stderr, "\nSystem Error!\nCommunication file couldn't removed by process A: '%s'\nError message: %s\n", fileName, strerror(errno));
+	}
 }
 
 
@@ -211,18 +238,41 @@ void ChildFunction(char fileName[], int maximum, int itemCount) {
 	
 	/* Assign a handler to prevent program shut down on arrival */
 	sigAction.sa_handler = EmptyHandler;
-	sigaction(SIGUSR1, &sigAction, NULL);
+	if (sigaction(SIGUSR1, &sigAction, NULL) == ERROR_CODE) {
+		fprintf(stderr, "\nSystem Error!\nSignal handler couldn't assigned by process B\nError message: %s\n", strerror(errno));
+		
+		/* Sending both signals to parent due to unknown state of parent signal mask process */
+		kill(getppid(), SIGUSR1);
+		kill(getppid(), SIGINT);
+		exitFlag = TRUE;
+	}
 	
 	/* Prepare a mask that excludes communication signal */
-	sigprocmask(SIG_SETMASK, NULL, &maskSet);
-	sigdelset(&maskSet, SIGUSR1);
+	if (sigprocmask(SIG_SETMASK, NULL, &maskSet) == ERROR_CODE && !exitFlag) {
+		fprintf(stderr, "\nSystem Error!\nSignal mask couldn't applied by process B\nError message: %s\n", strerror(errno));
+		kill(getppid(), SIGUSR1);
+		kill(getppid(), SIGINT);
+		exitFlag = TRUE;
+	}
+	
+	if (sigdelset(&maskSet, SIGUSR1) == ERROR_CODE && !exitFlag) {
+		fprintf(stderr, "\nSystem Error!\nSignal set couldn't changed by process B\nError message: %s\n", strerror(errno));
+		kill(getppid(), SIGUSR1);
+		kill(getppid(), SIGINT);
+		exitFlag = TRUE;
+	}
 	
 	/* Wait for parent to be ready, then send signal to indicate child is ready */
-	sigsuspend(&maskSet);
+	if (sigsuspend(&maskSet) == ERROR_CODE && !exitFlag && errno != EINTR) {
+		fprintf(stderr, "\nSystem Error!\nProcess B couldn't suspended itself\nError message: %s\n", strerror(errno));
+		kill(getppid(), SIGUSR1);
+		kill(getppid(), SIGINT);
+		exitFlag = TRUE;
+	}
 	kill(getppid(), SIGUSR1);
 	
-	/*exitFlag = TRUE;*/
-	 
+	
+	
 	/* Endless race (until SIGINT arrives) can start now */
 	while(!exitFlag) {
 		/* Try to open file */
@@ -279,6 +329,9 @@ void ChildFunction(char fileName[], int maximum, int itemCount) {
 			printf("Child ending\n");
 		}
 	}
+	
+	/* Exit */
+	_exit(EXIT_SUCCESS);
 }
 
 
