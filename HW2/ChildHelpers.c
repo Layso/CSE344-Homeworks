@@ -29,14 +29,30 @@ void ReadSequence(int fileDescriptor, int n, double **sequence, int line) {
 
 
 /* Function to calculate DFT from read line */
-int CalculateDFT(int n, double *sequence) {
-	return 0;
+/* Source of implementation: https://batchloaf.wordpress.com/2013/12/07/simple-dft-in-c/ */
+void CalculateDFT(int n, double *sequence, double **real, double **imaginary) {
+	int i, j;
+	double PI2 = M_PI * 2;
+
+
+    for (i=0 ; i<n ; ++i) {
+        (*real)[i] = 0;
+        (*imaginary)[i] = 0;
+        
+		for (j=0 ; j<n ; ++j) {
+			(*real)[i] += sequence[j] * cos(j * i * PI2 / n);
+		} 
+
+        for (j=0 ; j<n ; ++j) {
+			(*imaginary)[i] -= sequence[j] * sin(j * i * PI2 / n);
+		}
+    }
 }
 
 
 
 /* Function to log child operation */
-void ChildLogger(int line, int n, double *sequence, double dft) {
+void ChildLogger(int line, int n, double *sequence, double *real, double *imaginary) {
 	int i;
 	int fileDescriptor;
 	char string[STRING_LENGTH];
@@ -55,9 +71,15 @@ void ChildLogger(int line, int n, double *sequence, double dft) {
 			sprintf(string+strlen(string), "%.2f - ", sequence[i]);
 	
 		else
-			sprintf(string+strlen(string), "%.2f) is: %f\n", sequence[i], dft);
+			sprintf(string+strlen(string), "%.2f) is:\t", sequence[i]);
 	}
 	
+	for (i=0; i<n; ++i) {
+		sprintf(string+strlen(string), "(%.2f)+", real[i]);
+		sprintf(string+strlen(string), "(%.2f)i ", imaginary[i]);
+	}
+	
+	sprintf(string+strlen(string), "\n");
 	/* Preparing logger file name */
 	sprintf(loggerName, "processB_%d.log", getpid());
 	

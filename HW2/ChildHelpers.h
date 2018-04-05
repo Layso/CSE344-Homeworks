@@ -12,12 +12,12 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
-
+#include <math.h>
 
 
 /* Function definitions */
 void ReadSequence(int fileDescriptor, int n, double **sequence, int line);
-int CalculateDFT(int n, double *sequence);
-void ChildLogger(int line, int n, double *sequence, double dft);
+void CalculateDFT(int n, double *sequence, double **real, double **imaginary);
+void ChildLogger(int line, int n, double *sequence, double *real, double *imaginary);
 
 #endif

@@ -219,8 +219,7 @@ void ParentFunction(char fileName[], int maximum, int itemCount, pid_t childPID)
 void ChildFunction(char fileName[], int maximum, int itemCount) {
 	int lineCount;
 	int fileDescriptor;
-	double dft;
-	double *sequence;
+	double *sequence, *real, *imaginary;
 	struct flock lockStruct;
 	struct sigaction sigAction;
 	sigset_t maskSet, pendingSet;
@@ -305,9 +304,13 @@ void ChildFunction(char fileName[], int maximum, int itemCount) {
 					close(fileDescriptor);
 					
 					/* Processing, logging and clearing */
-					dft = CalculateDFT(itemCount, sequence);
-					ChildLogger(lineCount, itemCount, sequence, dft);
+					real = malloc (itemCount * sizeof(double));
+					imaginary = malloc (itemCount * sizeof(double));
+					CalculateDFT(itemCount, sequence, &real, &imaginary);
+					ChildLogger(lineCount, itemCount, sequence, real, imaginary);
 					free(sequence);
+					free(real);
+					free(imaginary);
 					
 					
 					/* Indicate the politely waiting parent that it can continue now */

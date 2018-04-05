@@ -1,6 +1,6 @@
 leysö: compile link 
 
-N = 10
+N = 5
 M = 50
 X = fileawd.dat
 
@@ -10,7 +10,7 @@ compile:
 	gcc -c 151044001_main.c ParentHelpers.c ChildHelpers.c -D_XOPEN_SOURCE=500 -ansi -Wall -pedantic -error
 	
 link:
-	gcc -o multiprocess_DFT 151044001_main.o ParentHelpers.o ChildHelpers.o
+	gcc -o multiprocess_DFT 151044001_main.o ParentHelpers.o ChildHelpers.o -lm
 
 run:
 	./multiprocess_DFT -N $(N) -X $(X) -M $(M)
@@ -19,6 +19,6 @@ runValgrind:
 	valgrind ./multiprocess_DFT -N $(N) -X $(X) -M $(M)
 
 clean:
-	rm -f *.o multiprocess_DFT
+	rm -f *.o *.log multiprocess_DFT
 	clear
 
