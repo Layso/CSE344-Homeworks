@@ -5,6 +5,7 @@
 **/exe
 **/multiprocess_DFT
 **/tiffProcessor
+**/shell
 
 # Data files
 *.tif
