@@ -44,7 +44,8 @@ linkcpp:
 run:
 	./$(execName) $(args)
 
-
+runVal:
+	valgrind ./$(execName) $(args)
 
 
 clean: clear
