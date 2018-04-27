@@ -23,22 +23,16 @@ int main(int argc, char *argv[]) {
 	/* Infinitely taking commands until the exit command */
 	do {
 		command = ReadLine();
-		if (IsValid(command)) {
+		if (command != NULL && IsValid(command)) {
 			AddToHistory(&commandHistory, command);
 			
-			/*printf("\nCommand hist:\n");*/
-			for (i=0; commandHistory[i]!=NULL; ++i) {
-				printf("%d) %s\n", i, commandHistory[i]);
-			}
-			/*printf("Read commmand: %s\n", command);*/
+			free(command);
 		}
 		
-		else {
+		else if (command != NULL) {
 			fprintf(stderr, "%s: command not found\n", command);
+			free(command);
 		}
-		
-		free(command);
-		/*lastCommand = NULL;*/	
 	} while(command != NULL);
 	
 	
