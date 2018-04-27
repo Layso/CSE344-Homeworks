@@ -11,88 +11,124 @@
 
 
 int main(int argc, char *argv[]) {
+	int i;
 	char *command = NULL;
 	char **commandHistory = NULL;
-	int i;
+	char **commandList = NULL;
 	
-	/* Initializing command history array */
+	
+	/* Initializing string arrays */
 	commandHistory = malloc(sizeof(char *));
+	commandList = malloc(sizeof(char *));
 	commandHistory[0] = NULL;
+	commandList[0] = NULL;
 	
 	
 	/* Infinitely taking commands until the exit command */
 	do {
-		command = ReadLine();
-		if (command != NULL && IsValid(command)) {
-			AddToHistory(&commandHistory, command);
+		ReadLine(&command);
+		if (command != NULL) {
+			SplitCommand(command, &commandList);
+			AddToHistory(command, &commandHistory);
 			
-			free(command);
-		}
-		
-		else if (command != NULL) {
-			fprintf(stderr, "%s: command not found\n", command);
+			for (i=0; commandList[i]!=NULL; ++i)
+				free(commandList[i]);
+			free(commandList);
 			free(command);
 		}
 	} while(command != NULL);
-	
 	
 	return EXIT_SUCCESS;
 }
 
 
 
+/* Function to create command list from  */
+void SplitCommand(char *command, char ***list) {
+	int i;
+	int size = ZERO;
+	int length = strlen(command);
+	char *token;
+	
+	
+	/* Allocating memory for command list */
+	*list = malloc(sizeof(char*));
+	
+	/* Getting tokens from command to fill the array */
+	token = strtok(command, " ");
+	do {
+		(*list)[size] = malloc(strlen(token));
+		strcpy((*list)[size++], token);
+		*list = realloc(*list, (size+1)*sizeof(char*));
+		(*list)[size] = NULL;
+	} while ((token = strtok(NULL, " ")) != NULL);
+	
+	
+	/* Recrateing the messed command string */
+	memset(command, ZERO, length);
+	for (i=0; i<size; ++i) {
+		command = strcat(command, (*list)[i]);
+		
+		if (i+1 != size+1) {
+			command = strcat(command, " ");
+		}
+		
+		else {
+			command = strcat(command, "\0");
+		}
+	}
+}
+
+
+
 /* Function to read input without having any string size */
-char *ReadLine() {
-	char *command = NULL;
+void ReadLine(char **command) {
 	int continueRead = TRUE;
 	int length = ZERO;
 	int bytesRead;
 	
 	
 	/* Allocationg initial space for command */
-	if ((command = malloc(CHAR_LENGTH_INTERVAL * sizeof(char))) == NULL) {
+	if ((*command = malloc(CHAR_LENGTH_INTERVAL * sizeof(char))) == NULL) {
 		fprintf(stderr, "\nError\nMemory allocation to read input failed\n");
-		return NULL;
+		*command = NULL;
 	}
 	
 	else {
 		do {
 			/* Read from stdin to command variable */
-			bytesRead = read(STDIN_FILENO, command+length, CHAR_LENGTH_INTERVAL);
+			bytesRead = read(STDIN_FILENO, (*command)+length, CHAR_LENGTH_INTERVAL);
 			if (bytesRead == ERROR_CODE) {
 				fprintf(stderr, "\nError\nMemory allocation to read input failed\n");
-				free(command);
-				return NULL;
+				free(*command);
+				*command = NULL;
 			}
 			
 			else {
 				length += bytesRead;
-				command = realloc(command, length+CHAR_LENGTH_INTERVAL);
+				*command = realloc(*command, length+CHAR_LENGTH_INTERVAL);
 				
 				/* If new line character read, end the input taking process */
-				if (command[length-1] == CHAR_NEW_LINE) {
-					command[length-1] = CHAR_NULL;
+				if ((*command)[length-1] == CHAR_NEW_LINE) {
+					(*command)[length-1] = CHAR_NULL;
 					continueRead = FALSE;
 				}
 			}
 		} while(continueRead);
 	}
-	
-	
-	return command;
 }
 
 
 
 /* Helper function to check if given command is a valid one */
-int IsValid(char *command) {
+int ValidateCommand(char *command) {
 	return !strcmp(COMMAND_CAT, command) || !strcmp(COMMAND_CD, command) || !strcmp(COMMAND_EXIT, command) || !strcmp(COMMAND_HELP, command) || !strcmp(COMMAND_LS, command) || !strcmp(COMMAND_PWD, command) || !strcmp(COMMAND_WC, command);
 }
 
 
 
 /* Function to insert new element to history array and resize it */
-void AddToHistory(char ***history, char *command) {
+void AddToHistory(char *command, char ***history) {
 	int i;
 	int size = ZERO;
 	char **newArray = NULL;
