@@ -23,4 +23,6 @@
 
 /*  */
 char *ReadLine();
+int IsValid(char *command);
+void AddToHistory(char ***history, char *command);
 #endif
