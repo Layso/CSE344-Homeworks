@@ -26,7 +26,8 @@
 
 enum Token {
 	Command,
-	Conjunction,
+	Pipe,
+	Redirector,
 	Unknown
 };
 

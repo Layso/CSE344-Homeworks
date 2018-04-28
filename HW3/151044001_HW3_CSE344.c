@@ -81,7 +81,7 @@ int ValidateCommandList(char **commandList) {
 		}
 		
 		/* If token is a conjunction */
-		else if (currentToken == Conjunction) {
+		else if (currentToken == Redirector || currentToken == Pipe) {
 			/* Conjunctions can't be at the beginning or the end */
 			if (nextToken == -1 || previousToken == -1) {
 				printf("Conjunction characters needed between commands and/or files: %s\n", commandList[i]);
@@ -89,8 +89,14 @@ int ValidateCommandList(char **commandList) {
 			}
 			
 			/* There must be a command near a conjunction */
-			else if (nextToken != Command && previousToken != Command) {
-				printf("No commands found to conjunct with: %s\n", commandList[i]);
+			else if (currentToken == Redirector && nextToken != Command && previousToken != Command) {
+				printf("Redirection characters needs a file name and a command: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
+				return FALSE;
+			}
+			
+			/* Pipes need both commands near them */
+			else if (currentToken == Pipe && (nextToken != Command || previousToken != Command)) {
+				printf("Pipe must be used between commands: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
 				return FALSE;
 			}
 		}
@@ -203,8 +209,12 @@ int ValidateToken(char *command) {
 		return Command;
 	}
 	
-	else if (!strcmp(DIRECTION_LEFT, command) || !strcmp(DIRECTION_RIGHT, command) || !strcmp(PIPELINE, command)) {
-		return Conjunction;
+	else if (!strcmp(DIRECTION_LEFT, command) || !strcmp(DIRECTION_RIGHT, command)) {
+		return Redirector;
+	}
+	
+	else if (!strcmp(PIPELINE, command)) {
+		return Pipe;
 	}
 	
 	else {
