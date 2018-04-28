@@ -24,10 +24,17 @@
 #define PIPELINE "|"
 
 
+enum Token {
+	Command,
+	Conjunction,
+	Unknown
+};
 
 /* Function prototypes */
 void ReadLine(char **command);
-int ValidateCommand(char *command);
 void AddToHistory(char *command, char ***history);
 void SplitCommand(char *command, char ***list);
+void ExecuteCommands(char **list);
+int ValidateToken(char *command);
+int ValidateCommandList(char **commandList);
 #endif

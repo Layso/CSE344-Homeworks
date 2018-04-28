@@ -11,7 +11,7 @@
 
 
 int main(int argc, char *argv[]) {
-	int i;
+	int i, status;
 	char *command = NULL;
 	char **commandHistory = NULL;
 	char **commandList = NULL;
@@ -29,7 +29,14 @@ int main(int argc, char *argv[]) {
 		ReadLine(&command);
 		if (command != NULL) {
 			SplitCommand(command, &commandList);
-			AddToHistory(command, &commandHistory);
+			if (ValidateCommandList(commandList)) {
+				ExecuteCommands(commandList);
+				AddToHistory(command, &commandHistory);
+			}
+			
+			else {
+				printf("Invalid\n");
+			}
 			
 			for (i=0; commandList[i]!=NULL; ++i)
 				free(commandList[i]);
@@ -39,6 +46,73 @@ int main(int argc, char *argv[]) {
 	} while(command != NULL);
 	
 	return EXIT_SUCCESS;
+}
+
+
+
+/*  */
+void ExecuteCommands(char **list) {
+	
+}
+
+
+
+/* Function to validate the order of the commands and conjunction characters */
+int ValidateCommandList(char **commandList) {
+	int i;
+	int previousToken;
+	int currentToken;
+	int nextToken;
+	
+	
+	for (i=0; commandList[i]!=NULL; ++i) {
+		currentToken = ValidateToken(commandList[i]);
+		nextToken = commandList[i+1]!=NULL ? ValidateToken(commandList[i+1]) : -1;
+		previousToken = i-1 >= ZERO ? ValidateToken(commandList[i-1]) : -1;
+		
+		
+		/* If token is a command */
+		if (currentToken == Command) {
+			/* Commands can not be sequential */
+			if ((nextToken != -1 && nextToken == Command) || (previousToken!=-1 && previousToken==Command)) {
+				printf("Conjunction characters needed between commands: %s %s %s\n", previousToken==-1 ? "" : commandList[i-1], commandList[i], nextToken==-1 ? "" : commandList[i+1]);
+				return FALSE;
+			}
+		}
+		
+		/* If token is a conjunction */
+		else if (currentToken == Conjunction) {
+			/* Conjunctions can't be at the beginning or the end */
+			if (nextToken == -1 || previousToken == -1) {
+				printf("Conjunction characters needed between commands and/or files: %s\n", commandList[i]);
+				return FALSE;
+			}
+			
+			/* There must be a command near a conjunction */
+			else if (nextToken != Command && previousToken != Command) {
+				printf("No commands found to conjunct with: %s\n", commandList[i]);
+				return FALSE;
+			}
+		}
+		
+		/* If token is unknown (considered as file name) */
+		else {
+			/* If it is only token then it is considered an unknown command */
+			if (previousToken == -1 && nextToken == -1) {
+				printf("Unknown command: %s\n", commandList[i]);
+				return FALSE;
+			}
+			
+			/* There must be a conjunction near a file name */
+			else if ((previousToken != -1 && !strcmp(commandList[i-1], DIRECTION_LEFT) && !strcmp(commandList[i], DIRECTION_RIGHT)) && (nextToken != -1 && !strcmp(commandList[i+1], DIRECTION_LEFT) && !strcmp(commandList[i+1], DIRECTION_RIGHT))) {
+				printf("File names need to be used with redirection characters: %s\n", commandList[i]);
+				return FALSE;
+			}
+		}
+	}
+	
+	
+	return TRUE;
 }
 
 
@@ -56,12 +130,15 @@ void SplitCommand(char *command, char ***list) {
 	
 	/* Getting tokens from command to fill the array */
 	token = strtok(command, " ");
-	do {
-		(*list)[size] = malloc(strlen(token));
-		strcpy((*list)[size++], token);
-		*list = realloc(*list, (size+1)*sizeof(char*));
-		(*list)[size] = NULL;
-	} while ((token = strtok(NULL, " ")) != NULL);
+	
+	if (token != NULL) {
+		do {
+			(*list)[size] = malloc(strlen(token));
+			strcpy((*list)[size++], token);
+			*list = realloc(*list, (size+1)*sizeof(char*));
+			(*list)[size] = NULL;
+		} while ((token = strtok(NULL, " ")) != NULL);
+	}
 	
 	
 	/* Recrateing the messed command string */
@@ -121,8 +198,18 @@ void ReadLine(char **command) {
 
 
 /* Helper function to check if given command is a valid one */
-int ValidateCommand(char *command) {
-	return !strcmp(COMMAND_CAT, command) || !strcmp(COMMAND_CD, command) || !strcmp(COMMAND_EXIT, command) || !strcmp(COMMAND_HELP, command) || !strcmp(COMMAND_LS, command) || !strcmp(COMMAND_PWD, command) || !strcmp(COMMAND_WC, command);
+int ValidateToken(char *command) {
+	if (!strcmp(COMMAND_CAT, command) || !strcmp(COMMAND_CD, command) || !strcmp(COMMAND_EXIT, command) || !strcmp(COMMAND_HELP, command) || !strcmp(COMMAND_LS, command) || !strcmp(COMMAND_PWD, command) || !strcmp(COMMAND_WC, command)) {
+		return Command;
+	}
+	
+	else if (!strcmp(DIRECTION_LEFT, command) || !strcmp(DIRECTION_RIGHT, command) || !strcmp(PIPELINE, command)) {
+		return Conjunction;
+	}
+	
+	else {
+		return Unknown;
+	}
 }
 
 
@@ -138,7 +225,7 @@ void AddToHistory(char *command, char ***history) {
 	while((*history)[size++] != NULL);
 	
 	
-	/* Comparing last command with new command to prevent piling commands on history */
+	/* Comparing last command with new command to prevent piling same command on history */
 	if (size == 1 || strcmp((*history)[size-2], command)) {
 		/* Creating new array with new size and all elements */
 		newArray = malloc((size+1) * sizeof(char*));
