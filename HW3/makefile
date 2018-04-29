@@ -6,8 +6,14 @@ execName = shell
 
 args = 
 
-extraFilesToClear = 
+extraFilesToClear = $(lsExecName) $(catExecName) $(wcExecName)
 
+
+lsExecName = ls
+
+catExecName = cat
+
+wcExecName = wc
 
 
 
@@ -33,7 +39,10 @@ compilecpp:
 
 
 linkc:
-	gcc -o $(execName) *.o
+	gcc -o $(execName) 151044001_HW3_CSE344.o
+	gcc -o ls ls.o
+	gcc -o cat cat.o
+	gcc -o wc wc.o
 
 linkcpp:
 	g++ -o $(execName) *.o
