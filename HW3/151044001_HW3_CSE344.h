@@ -22,9 +22,11 @@
 #define COMMAND_CAT "cat"
 #define COMMAND_WC "wc"
 #define COMMAND_EXIT "exit"
+#define COMMAND_HISTORY "history"
 #define DIRECTION_LEFT "<"
 #define DIRECTION_RIGHT ">"
 #define PIPELINE "|"
+#define FILE_PERMISSIONS 0777
 
 
 enum Token {
@@ -38,8 +40,12 @@ enum Token {
 void ReadLine(char **command);
 void AddToHistory(char *command, char ***history);
 void SplitCommand(char *command, char ***list);
-char *GetExecutableNameByCommand(char *command);
-int ExecuteCommands(char **list, char ***history);
+void CommandCd(char *path);
+void CommandHelp();
+void CommandPwd();
+void CommandHistory(int n, char **history);
+int IsSystemCommand(char *command);
+int ExecuteCommands(char **list, char **history, char *command);
 int ValidateToken(char *command);
 int ValidateCommandList(char **commandList);
 #endif

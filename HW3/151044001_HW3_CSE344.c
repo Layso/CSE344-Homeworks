@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 #include <wait.h>
+#include <fcntl.h>
 #include "151044001_HW3_CSE344.h"
 
 
@@ -28,17 +30,11 @@ int main(int argc, char *argv[]) {
 	do {
 		ReadLine(&command);
 		if (command != NULL) {
+			AddToHistory(command, &commandHistory);
 			SplitCommand(command, &commandList);
 			if (ValidateCommandList(commandList)) {
-				/*status = ExecuteCommands(commandList, &commandHistory);*/
+				status = ExecuteCommands(commandList, commandHistory, command);
 			}
-			
-			else {
-			}
-			
-			printf("\n");
-			
-			/* Clearing allocated memory for next command */
 			for (i=0; commandList[i]!=NULL; ++i)
 				free(commandList[i]);
 			free(commandList);
@@ -56,31 +52,114 @@ int main(int argc, char *argv[]) {
 
 
 /*  */
-int ExecuteCommands(char **list, char ***history) {
-	int size = -1;
-	int pipes = ZERO;
+int ExecuteCommands(char **list, char **history, char *command) {
+	int token;
+	int child;
 	int i = ZERO;
+	int fileDescriptor;
+	int redirectorLeft = FALSE;
+	int redirectorRight = FALSE;
+	int pipeSize = ZERO;
+	int commandSize = ZERO;
+	/*
+	int pipeIndex = ZERO;
+	int commandIndex = ZERO;
+	*/
+	
+	/* Counting total command and pipe numbers */
+	while (list[i] != NULL && !redirectorLeft && !redirectorRight) {
+		token = ValidateToken(list[i++]);
+		if (token == Command) ++commandSize;
+		if (token == Pipe) ++pipeSize;
+		if (list[i]!=NULL && !strcmp(list[i], DIRECTION_LEFT)) redirectorLeft = TRUE;
+		if (list[i]!=NULL && !strcmp(list[i], DIRECTION_RIGHT)) redirectorRight = TRUE;
+	}
 	
 	
+	/* Checking for exit command */
+	if (!strcmp(list[0], COMMAND_EXIT)) {
+		return FALSE;
+	}
 	
-	/* Counting list size and pipe count */
-	while (list[size++] != NULL)
-		if (!strcmp(list[size], PIPELINE))
-			++pipes;
+	/* Checking for chance directory command */
+	else if (!strcmp(list[0], COMMAND_CD)) {
+		CommandCd(list[1]);
+	}
 	
+	/* Checking for single commands */
+	else if (commandSize == 1) {
+		child = fork();
+		switch(child) {
+			case 0: 
+				i = 0;
+				
+				/* Output redirection process (if necessary) */
+				if (redirectorRight) {
+					while(list[i+1] != NULL) ++i;
+					fileDescriptor = open(list[i], O_CREAT | O_WRONLY | O_EXCL, FILE_PERMISSIONS);
+					if (fileDescriptor != ERROR_CODE) {
+						dup2(fileDescriptor, STDOUT_FILENO);
+						i = 0;
+					}
+					
+					else {
+						perror("redirector");
+					}
+				}
+				
+				/* Executable commands */
+				if (i == 0 && IsSystemCommand(list[0])) {
+					execve(list[0], list, NULL);
+				}
+				
+				/* Built-in commands */
+				else if (i == 0) {
+					if (!strcmp(list[0], COMMAND_HELP)) {
+						CommandHelp();
+					}
+					
+					else if (!strcmp(list[0], COMMAND_PWD)) {
+						CommandPwd();
+					}
+					
+					else if (!strcmp(list[i], COMMAND_HISTORY)) {
+						CommandHistory(list[1] == NULL ? 0 : atoi(list[1]), history);
+					}
+				}
+				
+				/* Deallocating the heap space before exit */
+				for (i=0; history[i]!=NULL; ++i)
+					free(history[i]);
+				
+				for (i=0; list[i]!=NULL; ++i)
+					free(list[i]);
+				free(command);
+				free(history);
+				free(list);
+				_exit(EXIT_SUCCESS);
+				break;
+			case -1: fprintf(stderr, "\nSystem Error\nFork failed\n%s", strerror(errno)); break;
+			default: wait(&child);
+		}
+	}
 	
-	do {
-		
-	} while(list[i] != NULL);
+	/* Multiple commands */
+	else {
+		printf("To be implemented\n");
+	}
 	
 	return TRUE;
 }
 
 
 
-/*  */
-char *GetExecutableNameByCommand(char *command) {
-	return NULL;
+/* Returns true if it is system command, returns false if it is built in command */
+int IsSystemCommand(char *command) {
+	if (!strcmp(command, COMMAND_LS) || !strcmp(command, COMMAND_CAT) || !strcmp(command, COMMAND_WC))
+		return TRUE;
+		
+	else
+		return FALSE;
 }
 
 
@@ -101,13 +180,13 @@ int ValidateCommandList(char **commandList) {
 		
 		/* There can't be conjunction character neither at the beginning nor at the end */
 		if ((i == 0 || commandList[i+1] == NULL) && (currentToken == Pipe || currentToken == Redirector)) {
-			printf("error: conjunctions can't be at the beginning or at the end\n");
+			printf("error: conjunctions can't be at the beginning or at the end: %s\n", commandList[i]);
 			return FALSE;
 		}
 		
 		/* Redirectors must be between a command and a file name that is the last token */
 		else if (currentToken == Redirector && nextToken != -1 && commandList[i+2] != NULL) {
-			printf("error: redirectors must be between last command and a file name\n");
+			printf("error: redirectors must be between last command and a file name: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
 			return FALSE;
 		}
 		
@@ -117,10 +196,23 @@ int ValidateCommandList(char **commandList) {
 			return FALSE;
 		}
 		
+		/* A command can not be fed by both file and pipe */
+		else if (currentToken == Pipe && commandList[i+2] != NULL && !strcmp(commandList[i+2], DIRECTION_LEFT)) {
+			printf("error: commands can't be fed by both files and pipes: %s %s %s\n", commandList[i], commandList[i+1], commandList[i+2]);
+			return FALSE;
+		}
+		
+		/* Command specific checks */
 		else if (currentToken == Command) {
 			/* There must be pipe between commands */
 			if (nextToken == Command) {
 				printf("error: commands can't be used sequentially without pipe: %s %s\n", commandList[i], commandList[i+1]);
+				return FALSE;
+			}
+			
+			/* Exit command must be alone */
+			else if (!strcmp(commandList[i], COMMAND_EXIT) && (previousToken != -1 || nextToken != -1)) {
+				printf("error: exit command must be alone\n");
 				return FALSE;
 			}
 			
@@ -135,7 +227,6 @@ int ValidateCommandList(char **commandList) {
 			return FALSE;
 		}
 	}
-	
 	
 	return TRUE;	
 	
@@ -238,6 +329,52 @@ int ValidateCommandList(char **commandList) {
 
 
 
+/* Built in cd command */
+void CommandCd(char *path) {
+	if (chdir(path) == ERROR_CODE) {
+		perror("cd");
+	}
+}
+
+
+
+/* Built in help command */
+void CommandHelp() {
+	printf("HW3 - CSE344 - System Programming - Gebze Technical University\nThis is a simple shell implementation for the homework of system programming course\nFeel free to use this program in any ways since there isn't any license\nImplemented by Deniz Can Erdem Yılmaz, spring 2018\n\n\n");
+	
+	printf("Supported commands:\n  ls              ->  Prints information about files on current directory\n  pwd             ->  Prints current working directory\n  cd [path]       ->  Changes current working directory with given (supports both normal and absolute) path\n");
+	
+	printf("  help            ->  Prints information about shell\n  cat [filename]  ->  Prints the content of given file\n  wc [filename]   ->  Counts the lines of given file\n  history [n]     ->  Prints the nth command on history, prints whole history if n doesn't provided\n  exit            ->  Shuts the shell down\n\n\n");
+	
+	printf("Supported conjunctors:\n  |  ->  Can connect the output of a command to input of another command\n  <  ->  Can redirect the file content to command as input\n  >  ->  Can redirect the output of command to file\n");
+}
+
+
+
+/* Built in pwd command */
+void CommandPwd() {
+	char path[FILENAME_MAX];
+	getcwd(path, FILENAME_MAX);
+	printf("%s\n", path);
+}
+
+
+
+/* Built in history command */
+void CommandHistory(int n, char**history) {
+	int i = ZERO;
+	
+	while(history[i] != NULL) {
+		if (n <= ZERO || n==i+1) {
+			printf("%d- %s\n", i+1, history[i]);
+		}
+		
+		++i;
+	}
+}
+
+
+
 /* Function to create command list from  */
 void SplitCommand(char *command, char ***list) {
 	int i;
@@ -261,6 +398,9 @@ void SplitCommand(char *command, char ***list) {
 		} while ((token = strtok(NULL, " ")) != NULL);
 	}
 	
+	else {
+		(*list)[0] = NULL;
+	}
 	
 	/* Recrateing the messed command string */
 	memset(command, ZERO, length);
@@ -284,6 +424,7 @@ void ReadLine(char **command) {
 	int continueRead = TRUE;
 	int length = ZERO;
 	int bytesRead;
+	char path[FILENAME_MAX];
 	
 	
 	/* Allocationg initial space for command */
@@ -293,6 +434,9 @@ void ReadLine(char **command) {
 	}
 	
 	else {
+		printf("%s$ ", getcwd(path, FILENAME_MAX));
+		fflush(stdout);
+		
 		do {
 			/* Read from stdin to command variable */
 			bytesRead = read(STDIN_FILENO, (*command)+length, CHAR_LENGTH_INTERVAL);
@@ -313,6 +457,10 @@ void ReadLine(char **command) {
 				}
 			}
 		} while(continueRead);
+		if (strlen(*command) == ZERO) {
+			free(*command);
+			*command = NULL;
+		}
 	}
 }
 
@@ -320,7 +468,7 @@ void ReadLine(char **command) {
 
 /* Helper function to check if given command is a valid one */
 int ValidateToken(char *command) {
-	if (!strcmp(COMMAND_CAT, command) || !strcmp(COMMAND_CD, command) || !strcmp(COMMAND_EXIT, command) || !strcmp(COMMAND_HELP, command) || !strcmp(COMMAND_LS, command) || !strcmp(COMMAND_PWD, command) || !strcmp(COMMAND_WC, command)) {
+	if (!strcmp(COMMAND_CAT, command) || !strcmp(COMMAND_CD, command) || !strcmp(COMMAND_EXIT, command) || !strcmp(COMMAND_HELP, command) || !strcmp(COMMAND_LS, command) || !strcmp(COMMAND_PWD, command) || !strcmp(COMMAND_WC, command) || !strcmp(COMMAND_HISTORY, command)) {
 		return Command;
 	}
 	
