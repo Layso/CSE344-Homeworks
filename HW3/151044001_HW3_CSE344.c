@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <wait.h>
 #include "151044001_HW3_CSE344.h"
 
 
@@ -11,7 +12,7 @@
 
 
 int main(int argc, char *argv[]) {
-	int i, status;
+	int i, status = TRUE;
 	char *command = NULL;
 	char **commandHistory = NULL;
 	char **commandList = NULL;
@@ -19,9 +20,8 @@ int main(int argc, char *argv[]) {
 	
 	/* Initializing string arrays */
 	commandHistory = malloc(sizeof(char *));
-	commandList = malloc(sizeof(char *));
 	commandHistory[0] = NULL;
-	commandList[0] = NULL;
+	commandList = NULL;
 	
 	
 	/* Infinitely taking commands until the exit command */
@@ -30,20 +30,25 @@ int main(int argc, char *argv[]) {
 		if (command != NULL) {
 			SplitCommand(command, &commandList);
 			if (ValidateCommandList(commandList)) {
-				ExecuteCommands(commandList);
-				AddToHistory(command, &commandHistory);
+				/*status = ExecuteCommands(commandList, &commandHistory);*/
 			}
 			
 			else {
-				printf("Invalid\n");
 			}
 			
+			printf("\n");
+			
+			/* Clearing allocated memory for next command */
 			for (i=0; commandList[i]!=NULL; ++i)
 				free(commandList[i]);
 			free(commandList);
 			free(command);
 		}
-	} while(command != NULL);
+	} while(status);
+	
+	for (i=0; commandHistory[i]!=NULL; ++i)
+		free(commandHistory[i]);
+	free(commandHistory);
 	
 	return EXIT_SUCCESS;
 }
@@ -51,15 +56,117 @@ int main(int argc, char *argv[]) {
 
 
 /*  */
-void ExecuteCommands(char **list) {
+int ExecuteCommands(char **list, char ***history) {
+	int size = -1;
+	int pipes = ZERO;
+	int i = ZERO;
 	
+	
+	
+	/* Counting list size and pipe count */
+	while (list[size++] != NULL)
+		if (!strcmp(list[size], PIPELINE))
+			++pipes;
+	
+	
+	do {
+		
+	} while(list[i] != NULL);
+	
+	return TRUE;
+}
+
+
+
+/*  */
+char *GetExecutableNameByCommand(char *command) {
+	return NULL;
 }
 
 
 
 /* Function to validate the order of the commands and conjunction characters */
 int ValidateCommandList(char **commandList) {
-	int i;
+	int i = -1;
+	int currentToken;
+	int previousToken;
+	int nextToken;
+	
+	/* Contorlling each token with a loop */
+	while (commandList[++i] != NULL) {
+		currentToken = ValidateToken(commandList[i]);
+		nextToken = commandList[i+1]!=NULL ? ValidateToken(commandList[i+1]) : -1;
+		previousToken = i-1 >= ZERO ? ValidateToken(commandList[i-1]) : -1;
+		
+		
+		/* There can't be conjunction character neither at the beginning nor at the end */
+		if ((i == 0 || commandList[i+1] == NULL) && (currentToken == Pipe || currentToken == Redirector)) {
+			printf("error: conjunctions can't be at the beginning or at the end\n");
+			return FALSE;
+		}
+		
+		/* Redirectors must be between a command and a file name that is the last token */
+		else if (currentToken == Redirector && nextToken != -1 && commandList[i+2] != NULL) {
+			printf("error: redirectors must be between last command and a file name\n");
+			return FALSE;
+		}
+		
+		/* There must be valid commands around pipes */
+		else if (currentToken == Pipe && (nextToken != Command || previousToken != Command)) {
+			printf("error: pipes must be used between valid commands: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
+			return FALSE;
+		}
+		
+		else if (currentToken == Command) {
+			/* There must be pipe between commands */
+			if (nextToken == Command) {
+				printf("error: commands can't be used sequentially without pipe: %s %s\n", commandList[i], commandList[i+1]);
+				return FALSE;
+			}
+			
+			/* Skipping possible arguments of command */
+			else {
+				while (commandList[i+1] != NULL && ValidateToken(commandList[i+1]) == Unknown) ++i;
+			}
+		}
+		
+		else if (currentToken == Unknown && (nextToken != -1 || previousToken == -1)) {
+			printf("error: unknown command: %s\n", commandList[i]);
+			return FALSE;
+		}
+	}
+	
+	
+	return TRUE;	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	/* If token is a conjunction */
+	/* Conjunctions can't be at the beginning or the end */
+	/* If the conjunction is a redirector */
+	/* There must be a command near a redirector */
+	/* There must be a file near a redirector */
+	/* Pipes need both commands near them */
+	/* If token is unknown (considered as file name) */
+	/* If it is only token then it is considered an unknown command */
+	/* There must be a conjunction near a file name */
+	/* Files can not be pointed as output more than once to avoid overriding */
+	/* If token is a command */
+	/* Commands can not be sequential */
+	/* Commands can not have multiple input sources */
+	/*int i;
 	int previousToken;
 	int currentToken;
 	int nextToken;
@@ -71,54 +178,62 @@ int ValidateCommandList(char **commandList) {
 		previousToken = i-1 >= ZERO ? ValidateToken(commandList[i-1]) : -1;
 		
 		
-		/* If token is a command */
 		if (currentToken == Command) {
-			/* Commands can not be sequential */
 			if ((nextToken != -1 && nextToken == Command) || (previousToken!=-1 && previousToken==Command)) {
 				printf("Conjunction characters needed between commands: %s %s %s\n", previousToken==-1 ? "" : commandList[i-1], commandList[i], nextToken==-1 ? "" : commandList[i+1]);
 				return FALSE;
 			}
+			
+			else if (previousToken == Pipe && (nextToken != -1 && !strcmp(DIRECTION_LEFT, commandList[i+1]))) {
+				printf("Commands can not have multiple input sources: %s %s %s\n", previousToken==-1 ? "" : commandList[i-1], commandList[i], nextToken==-1 ? "" : commandList[i+1]);
+				return FALSE;
+			}
 		}
 		
-		/* If token is a conjunction */
 		else if (currentToken == Redirector || currentToken == Pipe) {
-			/* Conjunctions can't be at the beginning or the end */
 			if (nextToken == -1 || previousToken == -1) {
 				printf("Conjunction characters needed between commands and/or files: %s\n", commandList[i]);
 				return FALSE;
 			}
 			
-			/* There must be a command near a conjunction */
-			else if (currentToken == Redirector && nextToken != Command && previousToken != Command) {
-				printf("Redirection characters needs a file name and a command: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
-				return FALSE;
+			else if (currentToken == Redirector) {
+				if (nextToken != Command && previousToken != Command) {
+					printf("Redirection characters needs a file name and a command: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
+					return FALSE;
+				}
+				
+				else if (nextToken == Command && previousToken == Command) {
+					printf("Redirection characters needs a file name and a command: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
+					return FALSE;
+				}
 			}
 			
-			/* Pipes need both commands near them */
 			else if (currentToken == Pipe && (nextToken != Command || previousToken != Command)) {
 				printf("Pipe must be used between commands: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
 				return FALSE;
 			}
 		}
 		
-		/* If token is unknown (considered as file name) */
 		else {
-			/* If it is only token then it is considered an unknown command */
 			if (previousToken == -1 && nextToken == -1) {
 				printf("Unknown command: %s\n", commandList[i]);
 				return FALSE;
 			}
 			
-			/* There must be a conjunction near a file name */
 			else if ((previousToken != -1 && !strcmp(commandList[i-1], DIRECTION_LEFT) && !strcmp(commandList[i], DIRECTION_RIGHT)) && (nextToken != -1 && !strcmp(commandList[i+1], DIRECTION_LEFT) && !strcmp(commandList[i+1], DIRECTION_RIGHT))) {
-				printf("File names need to be used with redirection characters: %s\n", commandList[i]);
+				printf("File names need to be used with redirection characters: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
+				return FALSE;
+			}
+			
+			else if (!strcmp(commandList[i-1], DIRECTION_RIGHT) && !strcmp(commandList[i+1], DIRECTION_LEFT)) {
+				printf("Files can't be pointed multiple times as output destination to avoid overriding: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
 				return FALSE;
 			}
 		}
 	}
 	
 	
-	return TRUE;
+	return TRUE;*/
 }
 
 
