@@ -57,23 +57,26 @@ int ExecuteCommands(char **list, char **history, char *command) {
 	int child;
 	int i = ZERO;
 	int fileDescriptor;
-	int redirectorLeft = FALSE;
+	int lastCommand = ZERO;
+	int secondLastCommand;
 	int redirectorRight = FALSE;
-	int pipeSize = ZERO;
 	int commandSize = ZERO;
-	/*
-	int pipeIndex = ZERO;
-	int commandIndex = ZERO;
-	*/
+	int pipeArr[PIPE_ARRAY_SIZE];
+	
 	
 	/* Counting total command and pipe numbers */
-	while (list[i] != NULL && !redirectorLeft && !redirectorRight) {
+	while (list[i] != NULL && !redirectorRight) {
 		token = ValidateToken(list[i++]);
-		if (token == Command) ++commandSize;
-		if (token == Pipe) ++pipeSize;
-		if (list[i]!=NULL && !strcmp(list[i], DIRECTION_LEFT)) redirectorLeft = TRUE;
+		if (token == Command) {
+			++commandSize;
+			
+			secondLastCommand = lastCommand;
+			lastCommand = i-1;
+		} 
+		
 		if (list[i]!=NULL && !strcmp(list[i], DIRECTION_RIGHT)) redirectorRight = TRUE;
 	}
+	
 	
 	
 	/* Checking for exit command */
@@ -81,18 +84,23 @@ int ExecuteCommands(char **list, char **history, char *command) {
 		return FALSE;
 	}
 	
-	/* Checking for chance directory command */
+	/* Checking for change directory command */
 	else if (!strcmp(list[0], COMMAND_CD)) {
-		CommandCd(list[1]);
+		if (list[2] != NULL) {
+			printf("cd: can not resolve path: %s %s\n", list[1], list[2]);
+		}
+		
+		else {
+			CommandCd(list[1]);
+		}
 	}
 	
 	/* Checking for single commands */
-	else if (commandSize == 1) {
+	else if (commandSize == 1 || (commandSize > 2 && strcmp(list[lastCommand], COMMAND_WC))) {
+		i = 0;
 		child = fork();
 		switch(child) {
-			case 0: 
-				i = 0;
-				
+			case 0: 	
 				/* Output redirection process (if necessary) */
 				if (redirectorRight) {
 					while(list[i+1] != NULL) ++i;
@@ -108,22 +116,22 @@ int ExecuteCommands(char **list, char **history, char *command) {
 				}
 				
 				/* Executable commands */
-				if (i == 0 && IsSystemCommand(list[0])) {
-					execve(list[0], list, NULL);
+				if (i == 0 && IsSystemCommand(list[lastCommand])) {
+					execve(list[lastCommand], list, NULL);
 				}
 				
 				/* Built-in commands */
 				else if (i == 0) {
-					if (!strcmp(list[0], COMMAND_HELP)) {
+					if (!strcmp(list[lastCommand], COMMAND_HELP)) {
 						CommandHelp();
 					}
 					
-					else if (!strcmp(list[0], COMMAND_PWD)) {
+					else if (!strcmp(list[lastCommand], COMMAND_PWD)) {
 						CommandPwd();
 					}
 					
-					else if (!strcmp(list[i], COMMAND_HISTORY)) {
-						CommandHistory(list[1] == NULL ? 0 : atoi(list[1]), history);
+					else if (!strcmp(list[lastCommand], COMMAND_HISTORY)) {
+						CommandHistory(list[lastCommand+1] == NULL ? 0 : atoi(list[lastCommand+1]), history);
 					}
 				}
 				
@@ -137,15 +145,119 @@ int ExecuteCommands(char **list, char **history, char *command) {
 				free(history);
 				free(list);
 				_exit(EXIT_SUCCESS);
-				break;
 			case -1: fprintf(stderr, "\nSystem Error\nFork failed\n%s", strerror(errno)); break;
 			default: wait(&child);
 		}
 	}
 	
-	/* Multiple commands */
+	/* Commands that require pipe which means last command is wc */
 	else {
-		printf("To be implemented\n");
+		if (pipe(pipeArr) == ERROR_CODE) {
+			fprintf(stderr, "\nSystem Error\nFork failed\n%s", strerror(errno));
+		}
+		
+		
+		child = fork();
+		switch (child) {
+			case 0:
+				i = 0;
+				dup2(pipeArr[PIPE_WRITE], STDOUT_FILENO);
+				
+				
+				/* If previous command is also wc then the result is certain */
+				if (!strcmp(list[secondLastCommand], COMMAND_WC)) {
+					printf("The commands from beginning to here doesn't change the result since the result of wc | wc will be equal to 1\n%c", '\0');
+					fflush(stdout);
+				}
+				
+				/* Executable commands */
+				else if (IsSystemCommand(list[secondLastCommand])) {
+					execve(list[secondLastCommand], list, NULL);
+				}
+				
+				/* Built-in commands */
+				else if (i == 0) {
+					if (!strcmp(list[secondLastCommand], COMMAND_HELP)) {
+						CommandHelp();
+					}
+					
+					else if (!strcmp(list[secondLastCommand], COMMAND_PWD)) {
+						CommandPwd();
+					}
+					
+					else if (!strcmp(list[secondLastCommand], COMMAND_HISTORY)) {
+						CommandHistory(list[secondLastCommand+1] == NULL ? 0 : atoi(list[secondLastCommand+1]), history);
+					}
+				}
+				
+				/* Deallocating the heap space before exit */
+				for (i=0; history[i]!=NULL; ++i)
+					free(history[i]);
+				
+				for (i=0; list[i]!=NULL; ++i)
+					free(list[i]);
+				free(command);
+				free(history);
+				free(list);
+				_exit(EXIT_SUCCESS);
+			case -1:  fprintf(stderr, "\nSystem Error\nFork failed\n%s", strerror(errno)); break;
+			default: wait(&child);
+		}
+		
+		child = fork();
+		switch (child) {
+			case 0:
+				i = 0;
+				dup2(pipeArr[PIPE_READ], STDIN_FILENO);
+				
+				/* Output redirection process (if necessary) */
+				if (redirectorRight) {
+					i = 0;
+					while(list[i+1] != NULL) ++i;
+					fileDescriptor = open(list[i], O_CREAT | O_WRONLY | O_EXCL, FILE_PERMISSIONS);
+					if (fileDescriptor != ERROR_CODE) {
+						dup2(fileDescriptor, STDOUT_FILENO);
+						i = 0;
+					}
+					
+					else {
+						perror("redirector");
+					}
+				}
+				
+				/* Executable commands */
+				if (i == 0 && IsSystemCommand(list[lastCommand])) {
+					execve(list[lastCommand], list, NULL);
+				}
+				
+				/* Built-in commands */
+				else if (i == 0) {
+					if (!strcmp(list[lastCommand], COMMAND_HELP)) {
+						CommandHelp();
+					}
+					
+					else if (!strcmp(list[lastCommand], COMMAND_PWD)) {
+						CommandPwd();
+					}
+					
+					else if (!strcmp(list[lastCommand], COMMAND_HISTORY)) {
+						CommandHistory(list[lastCommand+1] == NULL ? 0 : atoi(list[lastCommand+1]), history);
+					}
+				}
+				
+				/* Deallocating the heap space before exit */
+				for (i=0; history[i]!=NULL; ++i)
+					free(history[i]);
+				
+				for (i=0; list[i]!=NULL; ++i)
+					free(list[i]);
+				free(command);
+				free(history);
+				free(list);
+				_exit(EXIT_SUCCESS);
+			case -1:  fprintf(stderr, "\nSystem Error\nFork failed\n%s", strerror(errno)); break;
+			default: wait(&child);
+		}
 	}
 	
 	return TRUE;
@@ -191,7 +303,7 @@ int ValidateCommandList(char **commandList) {
 		}
 		
 		/* There must be valid commands around pipes */
-		else if (currentToken == Pipe && (nextToken != Command || previousToken != Command)) {
+		else if (currentToken == Pipe && (nextToken != Command)) {
 			printf("error: pipes must be used between valid commands: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
 			return FALSE;
 		}
@@ -228,103 +340,7 @@ int ValidateCommandList(char **commandList) {
 		}
 	}
 	
-	return TRUE;	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	/* If token is a conjunction */
-	/* Conjunctions can't be at the beginning or the end */
-	/* If the conjunction is a redirector */
-	/* There must be a command near a redirector */
-	/* There must be a file near a redirector */
-	/* Pipes need both commands near them */
-	/* If token is unknown (considered as file name) */
-	/* If it is only token then it is considered an unknown command */
-	/* There must be a conjunction near a file name */
-	/* Files can not be pointed as output more than once to avoid overriding */
-	/* If token is a command */
-	/* Commands can not be sequential */
-	/* Commands can not have multiple input sources */
-	/*int i;
-	int previousToken;
-	int currentToken;
-	int nextToken;
-	
-	
-	for (i=0; commandList[i]!=NULL; ++i) {
-		currentToken = ValidateToken(commandList[i]);
-		nextToken = commandList[i+1]!=NULL ? ValidateToken(commandList[i+1]) : -1;
-		previousToken = i-1 >= ZERO ? ValidateToken(commandList[i-1]) : -1;
-		
-		
-		if (currentToken == Command) {
-			if ((nextToken != -1 && nextToken == Command) || (previousToken!=-1 && previousToken==Command)) {
-				printf("Conjunction characters needed between commands: %s %s %s\n", previousToken==-1 ? "" : commandList[i-1], commandList[i], nextToken==-1 ? "" : commandList[i+1]);
-				return FALSE;
-			}
-			
-			else if (previousToken == Pipe && (nextToken != -1 && !strcmp(DIRECTION_LEFT, commandList[i+1]))) {
-				printf("Commands can not have multiple input sources: %s %s %s\n", previousToken==-1 ? "" : commandList[i-1], commandList[i], nextToken==-1 ? "" : commandList[i+1]);
-				return FALSE;
-			}
-		}
-		
-		else if (currentToken == Redirector || currentToken == Pipe) {
-			if (nextToken == -1 || previousToken == -1) {
-				printf("Conjunction characters needed between commands and/or files: %s\n", commandList[i]);
-				return FALSE;
-			}
-			
-			else if (currentToken == Redirector) {
-				if (nextToken != Command && previousToken != Command) {
-					printf("Redirection characters needs a file name and a command: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
-					return FALSE;
-				}
-				
-				else if (nextToken == Command && previousToken == Command) {
-					printf("Redirection characters needs a file name and a command: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
-					return FALSE;
-				}
-			}
-			
-			else if (currentToken == Pipe && (nextToken != Command || previousToken != Command)) {
-				printf("Pipe must be used between commands: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
-				return FALSE;
-			}
-		}
-		
-		else {
-			if (previousToken == -1 && nextToken == -1) {
-				printf("Unknown command: %s\n", commandList[i]);
-				return FALSE;
-			}
-			
-			else if ((previousToken != -1 && !strcmp(commandList[i-1], DIRECTION_LEFT) && !strcmp(commandList[i], DIRECTION_RIGHT)) && (nextToken != -1 && !strcmp(commandList[i+1], DIRECTION_LEFT) && !strcmp(commandList[i+1], DIRECTION_RIGHT))) {
-				printf("File names need to be used with redirection characters: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
-				return FALSE;
-			}
-			
-			else if (!strcmp(commandList[i-1], DIRECTION_RIGHT) && !strcmp(commandList[i+1], DIRECTION_LEFT)) {
-				printf("Files can't be pointed multiple times as output destination to avoid overriding: %s %s %s\n", commandList[i-1], commandList[i], commandList[i+1]);
-				return FALSE;
-			}
-		}
-	}
-	
-	
-	return TRUE;*/
+	return TRUE;
 }
 
 
@@ -334,6 +350,9 @@ void CommandCd(char *path) {
 	if (chdir(path) == ERROR_CODE) {
 		perror("cd");
 	}
+	
+	printf("%c", '\0');
+	fflush(STDIN_FILENO);
 }
 
 
@@ -347,6 +366,8 @@ void CommandHelp() {
 	printf("  help            ->  Prints information about shell\n  cat [filename]  ->  Prints the content of given file\n  wc [filename]   ->  Counts the lines of given file\n  history [n]     ->  Prints the nth command on history, prints whole history if n doesn't provided\n  exit            ->  Shuts the shell down\n\n\n");
 	
 	printf("Supported conjunctors:\n  |  ->  Can connect the output of a command to input of another command\n  <  ->  Can redirect the file content to command as input\n  >  ->  Can redirect the output of command to file\n");
+	printf("%c", '\0');
+	fflush(STDIN_FILENO);
 }
 
 
@@ -355,7 +376,8 @@ void CommandHelp() {
 void CommandPwd() {
 	char path[FILENAME_MAX];
 	getcwd(path, FILENAME_MAX);
-	printf("%s\n", path);
+	printf("%s\n%c", path, '\0');
+	fflush(STDIN_FILENO);
 }
 
 
@@ -371,6 +393,8 @@ void CommandHistory(int n, char**history) {
 		
 		++i;
 	}
+	printf("%c", '\0');
+	fflush(STDIN_FILENO);
 }
 
 
@@ -425,6 +449,8 @@ void ReadLine(char **command) {
 	int length = ZERO;
 	int bytesRead;
 	char path[FILENAME_MAX];
+	int i;
+	int status = FALSE;
 	
 	
 	/* Allocationg initial space for command */
@@ -460,6 +486,17 @@ void ReadLine(char **command) {
 		if (strlen(*command) == ZERO) {
 			free(*command);
 			*command = NULL;
+		}
+		
+		else {
+			for (i=0; i<strlen(*command); ++i)
+				if ((*command)[i] != ' ')
+					status = TRUE;
+			
+			if (!status) {
+				free(*command);
+				*command = NULL;
+			}
 		}
 	}
 }

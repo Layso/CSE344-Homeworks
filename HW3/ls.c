@@ -51,10 +51,9 @@ int main(int argc, char *argv[]) {
 				printf("\t   %s\n", direntPtr->d_name);
 			}
 		}
+		printf("%c", '\0');
 	}
 	
 	closedir(dirPtr);
-
-	
 	return 0;
 }
