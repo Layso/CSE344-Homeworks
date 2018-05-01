@@ -4,7 +4,7 @@ leysö: clean compilecansi linkc
 
 execName = exe
 
-args = 
+args = test
 
 extraFilesToClear = 
 
@@ -24,7 +24,7 @@ compilec:
 	gcc -c *.c
 
 compilecansi:
-	gcc -c *.c -ansi -Wall -pedantic -error
+	gcc -c *.c -ansi -Wall -pedantic -error -D_XOPEN_SOURCE=500
 
 compilecpp:
 	g++ -c *.cpp
@@ -33,7 +33,7 @@ compilecpp:
 
 
 linkc:
-	gcc -o $(execName) *.o
+	gcc -o $(execName) *.o -lrt 
 
 linkcpp:
 	g++ -o $(execName) *.o
@@ -43,6 +43,9 @@ linkcpp:
 
 run:
 	./$(execName) $(args)
+	
+runVal:
+	valgrind ./$(execName) $(args)
 
 
 
