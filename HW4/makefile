@@ -4,7 +4,7 @@ leysö: clean compilecansi linkc
 
 execName = exe
 
-args = test
+args = 10
 
 extraFilesToClear = 
 
