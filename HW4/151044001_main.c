@@ -133,7 +133,6 @@ void Chef(int id, int descriptor, Ingredient firstRequired, Ingredient secondReq
 		sem_wait(&shared->working);
 		
 		
-		
 		/* First ingredient couldn't acquired, try again with next ingredient set */
 		if (sem_trywait(&shared->ingredients[firstRequired]) && errno == EAGAIN) {
 			/* Intentionally left blank (rather then using continue) to release the processing lock */
@@ -147,7 +146,7 @@ void Chef(int id, int descriptor, Ingredient firstRequired, Ingredient secondReq
 		
 		/* Both locks for ingredients succesfully acquired, notify wholesaler that şekerpare is baked */
 		else {
-			fprintf(stderr, "Chef #%d bake the şekerpare %d - %d\n\n", id+1, firstRequired, secondRequired);
+			fprintf(stderr, "Chef #%d baked the şekerpare with supplied %s and %s\n\n", id+1, GetName(firstRequired), GetName(secondRequired));
 			sem_post(&shared->done);
 		}
 		
@@ -167,7 +166,6 @@ void Chef(int id, int descriptor, Ingredient firstRequired, Ingredient secondReq
 void WholeSaler(int descriptor) {
 	SharedStructure *shared = NULL;
 	int first, second;
-	int i;
 	
 	
 	/* Getting shared structure to communicate with other processes */
@@ -176,25 +174,28 @@ void WholeSaler(int descriptor) {
 	
 	/* Iterating untill SIGINT recieved */
 	while (keepWorking) {
-		/* Acquire the lock to process ingredients */
-		sem_wait(&shared->working);
-		
 		/* Produces 2 random ingredients different than each other */
 		first = (random() % INGREDIENT_COUNT);
 		while ((second = random() % INGREDIENT_COUNT) == first);
 		
+		
+		/* Acquire the lock to supply ingredients */
+		sem_wait(&shared->working);
+		fprintf(stderr, "Wholesaler is dropping %s and %s\n", GetName(first), GetName(second));
+		
 		/* Increase the number of produced ingredients */
-		fprintf(stderr, "Wholesaler is dropping %d - %s and %d - %s\n", first, GetName(first), second, GetName(second));
 		sem_post(&shared->ingredients[first]);
 		sem_post(&shared->ingredients[second]);
 		
 		/* Release the process lock and wait for şekerpare to be baked */
-		fprintf(stderr, "Wholesaler is waiting for şekerpare\n\n");
 		sem_post(&shared->working);
 		
+		
 		/* Checking flag in case no chefs remained to post the done semaphore */
-		if (keepWorking)
+		if (keepWorking) {
+			fprintf(stderr, "Wholesaler is waiting for şekerpare\n\n");
 			sem_wait(&shared->done);
+		}
 	}
 	
 	
