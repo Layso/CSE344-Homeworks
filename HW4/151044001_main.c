@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 	
-	/* Getting shared memory structure and initializing semaphores */
+	/* Getting shared memory structure and initializing structure members */
 	shared = (SharedStructure*)mmap(NULL, sizeof(SharedStructure), PROT_READ | PROT_WRITE, MAP_SHARED, sharedDescriptor, ZERO);
 	sem_init(&(shared->working), TRUE, UNLOCKED);
 	sem_init(&(shared->done), TRUE, LOCKED);
@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
 							 shm_unlink(SHARED_MEMORY_NAME);
 							 return EXIT_FAILURE;
 					case 0 : Chef(currentChild++, sharedDescriptor, i, j);
-					default: childList[++currentChild] = status;
+					default: childList[currentChild++] = status;
 				}
 			}
 		}
@@ -122,12 +122,10 @@ char *GetName(Ingredient ingredient) {
  * to be supplied by wholesaler to bake the şekerpare until SIGINT signal recieved */
 void Chef(int id, int descriptor, Ingredient firstRequired, Ingredient secondRequired) {
 	SharedStructure *shared = NULL;
-	int first, second;
 	
 	
 	/* Getting shared structure to communicate with other processes */
 	shared = (SharedStructure*)mmap(NULL, sizeof(SharedStructure), PROT_READ | PROT_WRITE, MAP_SHARED, descriptor, ZERO);
-	
 	
 	/* Iterating until SIGINT recieved */
 	while (keepWorking) {
@@ -135,45 +133,30 @@ void Chef(int id, int descriptor, Ingredient firstRequired, Ingredient secondReq
 		sem_wait(&shared->working);
 		
 		
+		
+		/* First ingredient couldn't acquired, try again with next ingredient set */
 		if (sem_trywait(&shared->ingredients[firstRequired]) && errno == EAGAIN) {
-			/* First ingredient couldn't acquired, try again with next ingredient set */
 			/* Intentionally left blank (rather then using continue) to release the processing lock */
 		}
 		
+		/* First ingredient acquired but second couldn't. So release the first lock to
+		 * let other chefs bake and try again with next ingredient set */
 		else if (sem_trywait(&shared->ingredients[secondRequired]) && errno == EAGAIN) {
-			/* First ingredient acquired but second couldn't. So release the first lock to
-			 * let other chefs bake and try again with next ingredient set */
 			sem_post(&shared->ingredients[firstRequired]);
 		}
 		
+		/* Both locks for ingredients succesfully acquired, notify wholesaler that şekerpare is baked */
 		else {
-			/* Both locks for ingredients succesfully acquired, notify wholesaler that şekerpare is baked */
-			fprintf(stderr, "Chef #%d bake the şekerpare %d - %d\n\n", id, firstRequired, secondRequired);
+			fprintf(stderr, "Chef #%d bake the şekerpare %d - %d\n\n", id+1, firstRequired, secondRequired);
 			sem_post(&shared->done);
 		}
 		
 		
 		/* Release the processing lock */
 		sem_post(&shared->working);
-		
-		
-		/* Old version of homework, wasn't sufficient enough for me to send this */
-		/* Get the values of ingredient semaphores to see if requirements are supplied */
-		/* If required ingredients are supplied bake şekerpare and notify the wholesaler */
-		/*
-		sem_getvalue(&shared->ingredients[firstRequired], &first);
-		sem_getvalue(&shared->ingredients[secondRequired], &second);
-		if (first != ZERO && second != ZERO) {
-			printf("Chef #%d baking with %s and %s\n", id, GetName(firstRequired), GetName(secondRequired));
-			sem_wait(&shared->ingredients[firstRequired]);
-			sem_wait(&shared->ingredients[secondRequired]);
-			printf("Chef #%d delivering şekerpare to wholesaler\n\n", id);
-			sem_post(&shared->done);
-		}
-		*/
 	}
 
-	printf("Chef %d exit\n", id);
+	printf("Chef %d exit\n", id+1);
 	_exit(EXIT_SUCCESS);
 }
 
@@ -184,6 +167,7 @@ void Chef(int id, int descriptor, Ingredient firstRequired, Ingredient secondReq
 void WholeSaler(int descriptor) {
 	SharedStructure *shared = NULL;
 	int first, second;
+	int i;
 	
 	
 	/* Getting shared structure to communicate with other processes */
@@ -200,12 +184,12 @@ void WholeSaler(int descriptor) {
 		while ((second = random() % INGREDIENT_COUNT) == first);
 		
 		/* Increase the number of produced ingredients */
-		printf("Wholesaler is dropping %d - %s and %d - %s\n", first, GetName(first), second, GetName(second));
+		fprintf(stderr, "Wholesaler is dropping %d - %s and %d - %s\n", first, GetName(first), second, GetName(second));
 		sem_post(&shared->ingredients[first]);
 		sem_post(&shared->ingredients[second]);
 		
 		/* Release the process lock and wait for şekerpare to be baked */
-		printf("Wholesaler is waiting for şekerpare\n\n");
+		fprintf(stderr, "Wholesaler is waiting for şekerpare\n\n");
 		sem_post(&shared->working);
 		
 		/* Checking flag in case no chefs remained to post the done semaphore */
@@ -214,6 +198,6 @@ void WholeSaler(int descriptor) {
 	}
 	
 	
-	printf("Saler exit\n");
+	fprintf(stderr, "Saler exit\n");
 	_exit(EXIT_SUCCESS);
 }
