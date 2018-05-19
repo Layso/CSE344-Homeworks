@@ -1,10 +1,10 @@
-leysö: clean
+leysö: clean compilecansi linkc
 
 
 
 execName = exe
 
-args = 
+args = data.dat
 
 extraFilesToClear = 
 
@@ -24,7 +24,7 @@ compilec:
 	gcc -c *.c
 
 compilecansi:
-	gcc -c *.c -ansi -Wall -pedantic -error
+	gcc -c *.c -ansi -Wall -pedantic -error -pthread
 
 compilecpp:
 	g++ -c *.cpp
