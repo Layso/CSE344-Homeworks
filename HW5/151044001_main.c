@@ -39,7 +39,7 @@ struct Client {
 };
 
 
-void CreateFlorists(char *fileName, struct Florist **florists, struct Client **clients);
+void ParseFile(char *fileName, struct Florist **florists, struct Client **clients);
 
 
 
@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
 	}
 	
 	
-	CreateFlorists(argv[1], &florists, &clients);
+	ParseFile(argv[1], &florists, &clients);
 	for (i=0; strcmp(florists[i].name, EMPTY_STRING); ++i) {
 		printf("Florist %s located at %d,%d with speed of %f and has %d flowers\n", florists[i].name, florists[i].x, florists[i].y, florists[i].tick, florists[i].flowerCount);
 	}
@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
 
 
 
-void CreateFlorists(char *fileName, struct Florist **florists, struct Client **clients) {
+void ParseFile(char *fileName, struct Florist **florists, struct Client **clients) {
 	int index = ZERO;
 	int clientCount = ZERO;
 	int clientIndex = ZERO;
