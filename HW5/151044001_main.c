@@ -1,3 +1,4 @@
+#include "151044001_main.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -7,47 +8,27 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <errno.h>
+#include <time.h>
 
-#define ZERO 0
-#define TRUE 1
-#define FALSE 0
-#define ERROR_CODE -1
-#define REQUIRED_ARGC 2
-#define STRING_LENGTH 64
-#define ARRAY_LENGTH 50
-#define LINE_LENGTH 1024
-#define DATA_DELIMITERS "():;, \n"
-#define EMPTY_STRING "\n"
-#define READ_MODE "r"
+
+#include "queue.h"
 
 
 
-struct Florist {
-	char name[STRING_LENGTH];
-	int x;
-	int y;
-	float tick;
-	int flowerCount;
-	char flowers[ARRAY_LENGTH][STRING_LENGTH];	
-};
-
-struct Client {
-	char name[STRING_LENGTH];
-	int x;
-	int y;
-	char request[STRING_LENGTH];
-};
-
-
-void ParseFile(char *fileName, struct Florist **florists, struct Client **clients);
+Queue **workQueue = NULL;
+pthread_cond_t *conditionVariables = NULL;
+pthread_mutex_t *mutexes = NULL;
+int keepWorking = TRUE;
 
 
 
 int main(int argc, char **argv) {
 	int i;
-	struct Florist *florists = NULL;
+	int floristCount, clientCount;
+	pthread_t *threadArray = NULL;
 	struct Client *clients = NULL;
-	
+	struct Florist *florists = NULL;
+	int a;
 	
 	if (argc != REQUIRED_ARGC) {
 		fprintf(stderr, "Usage: %s [fileName]\n", argv[0]);
@@ -55,34 +36,88 @@ int main(int argc, char **argv) {
 	}
 	
 	
-	ParseFile(argv[1], &florists, &clients);
-	for (i=0; strcmp(florists[i].name, EMPTY_STRING); ++i) {
-		printf("Florist %s located at %d,%d with speed of %f and has %d flowers\n", florists[i].name, florists[i].x, florists[i].y, florists[i].tick, florists[i].flowerCount);
+	ParseFile(argv[1], &florists, &clients, &floristCount, &clientCount);
+	mutexes = malloc(sizeof(pthread_mutex_t) * floristCount);
+	workQueue = malloc(sizeof(Queue*) * floristCount);
+	threadArray = malloc(sizeof(pthread_t) * floristCount);
+	conditionVariables = malloc(sizeof(pthread_cond_t) * floristCount);
+	for (i=0; i<floristCount; ++i) {
+		workQueue[i] = NULL;
+		QueueInitialize(workQueue+i);
+		pthread_mutex_init(mutexes+i, NULL);
+		pthread_cond_init(conditionVariables+i, NULL);
+		pthread_create(threadArray+i, NULL, FloristThread, florists+i);
 	}
 	
-	for (i=0; strcmp(clients[i].name, EMPTY_STRING); ++i) {
-		printf("%s waiting for %s at location %d,%d\n", clients[i].name, clients[i].request, clients[i].x, clients[i].y);
+	for (i=0; i<clientCount; ++i) {
+		/* TODO: Get the proper florist index to a variable with more meaningful name */
+		a = rand()%3;
+		
+		pthread_mutex_lock(&mutexes[a]);
+		QueueOffer(workQueue[a], clients[i]);
+		pthread_cond_signal(&conditionVariables[a]);
+		pthread_mutex_unlock(&mutexes[a]);
 	}
 	
+	keepWorking = FALSE;
+	for (i=0; i<floristCount; ++i) {
+		pthread_cond_signal(&conditionVariables[i]);
+		pthread_join(*(threadArray+i), NULL);
+		QueueDestruct(workQueue[i]);
+	}
+	
+	free(conditionVariables);
+	free(threadArray);
+	free(workQueue);
 	free(florists);
 	free(clients);
+	free(mutexes);
+	
+	
 	return EXIT_SUCCESS;
 }
 
 
 
-void ParseFile(char *fileName, struct Florist **florists, struct Client **clients) {
+void *FloristThread(void *parameter) {
+	struct Florist *info = (struct Florist*)parameter;
+	struct Client currentClient;
+	/*
+	struct Florist info = *(struct Florist*)parameter;
+	printf("Florist %s located at %d,%d with speed of %f and has %d flowers\n", info.name, info.x, info.y, info.tick, info.flowerCount);
+	*/
+	while (!QueueEmpty(workQueue[info->id]) || keepWorking) {
+		pthread_mutex_lock(&mutexes[info->id]);
+		while (QueueEmpty(workQueue[info->id]) && keepWorking)
+			pthread_cond_wait(&conditionVariables[info->id], &mutexes[info->id]);
+		
+		currentClient = QueuePoll(workQueue[info->id]);
+		pthread_mutex_unlock(&mutexes[info->id]);
+		
+		/* TODO: Causes last clients to be skipped before processing */
+		if (keepWorking) {
+			printf("%s serving to %s for %s\n", info->name, currentClient.name, currentClient.request);
+		}
+	}
+
+	printf("Florist %d out\n", info->id);
+	return NULL;
+}
+
+
+
+void ParseFile(char *fileName, struct Florist **florists, struct Client **clients, int *floristCount, int *clientCount) {
+	int flag = FALSE;
 	int index = ZERO;
-	int clientCount = ZERO;
 	int clientIndex = ZERO;
 	int floristIndex = ZERO;
-	int floristCount = ZERO;
-	int flag = FALSE;
 	char *lineToken = NULL;
 	char line[LINE_LENGTH];
 	FILE *filePtr = NULL;
 	
 	
+	*clientCount = ZERO;
+	*floristCount = ZERO;
 	filePtr = fopen(fileName, READ_MODE);
 	if (filePtr == NULL) {
 		fprintf(stderr, "\nSystem Error\nData file couldn't opened\n%s", strerror(errno));
@@ -94,14 +129,14 @@ void ParseFile(char *fileName, struct Florist **florists, struct Client **client
 		if (strlen(line) == strlen(EMPTY_STRING))
 			flag = TRUE;
 		else if (flag)
-			++clientCount;	
+			++(*clientCount);	
 		else
-			++floristCount;
+			++(*floristCount);
 	}
 	
 	
-	*florists = malloc(sizeof(struct Florist) * (floristCount+1));
-	*clients = malloc(sizeof(struct Client) * (clientCount+1));
+	*florists = malloc(sizeof(struct Florist) * (*floristCount));
+	*clients = malloc(sizeof(struct Client) * (*clientCount));
 	fseek(filePtr, SEEK_SET, ZERO);
 	
 	
@@ -111,6 +146,7 @@ void ParseFile(char *fileName, struct Florist **florists, struct Client **client
 		}
 		
 		index = ZERO;
+		(*florists)[floristIndex].id = floristIndex;
 		(*florists)[floristIndex].flowerCount = ZERO;
 		lineToken = strtok(line, DATA_DELIMITERS);
 		do {

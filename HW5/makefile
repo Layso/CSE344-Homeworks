@@ -24,7 +24,7 @@ compilec:
 	gcc -c *.c
 
 compilecansi:
-	gcc -c *.c -ansi -Wall -pedantic -error -pthread
+	gcc -c *.c -ansi -Wall -pedantic -error
 
 compilecpp:
 	g++ -c *.cpp
@@ -33,7 +33,7 @@ compilecpp:
 
 
 linkc:
-	gcc -o $(execName) *.o
+	gcc -o $(execName) *.o -pthread
 
 linkcpp:
 	g++ -o $(execName) *.o
