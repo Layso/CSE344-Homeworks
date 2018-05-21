@@ -24,7 +24,7 @@ typedef struct Queue {
 void QueueInitialize(Queue **queue);
 void QueueDestruct(Queue *queue);
 void QueueOffer(Queue *queue, struct Client item);
-struct Client QueuePoll(Queue *queue);
+struct Client QueuePoll(Queue *queue, int *status);
 int QueueEmpty(Queue *queue);
 
 

@@ -82,25 +82,30 @@ int main(int argc, char **argv) {
 void *FloristThread(void *parameter) {
 	struct Florist *info = (struct Florist*)parameter;
 	struct Client currentClient;
-	/*
-	struct Florist info = *(struct Florist*)parameter;
-	printf("Florist %s located at %d,%d with speed of %f and has %d flowers\n", info.name, info.x, info.y, info.tick, info.flowerCount);
-	*/
+	struct Statistic stats;
+	int status;
+	
+	
+	strcpy(stats.name, info->name);
+	stats.totalSales = ZERO;
+	stats.totalTime = ZERO;
+	
+	
 	while (!QueueEmpty(workQueue[info->id]) || keepWorking) {
 		pthread_mutex_lock(&mutexes[info->id]);
 		while (QueueEmpty(workQueue[info->id]) && keepWorking)
 			pthread_cond_wait(&conditionVariables[info->id], &mutexes[info->id]);
 		
-		currentClient = QueuePoll(workQueue[info->id]);
+		currentClient = QueuePoll(workQueue[info->id], &status);
 		pthread_mutex_unlock(&mutexes[info->id]);
 		
-		/* TODO: Causes last clients to be skipped before processing */
-		if (keepWorking) {
+		
+		if (status) {
 			printf("%s serving to %s for %s\n", info->name, currentClient.name, currentClient.request);
 		}
 	}
 
-	printf("Florist %d out\n", info->id);
+	printf("Florist %s closing the shop\n", info->name);
 	return NULL;
 }
 

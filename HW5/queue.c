@@ -57,12 +57,13 @@ void QueueOffer(Queue *queue, struct Client item) {
 
 
 
-struct Client QueuePoll(Queue *queue) {
+struct Client QueuePoll(Queue *queue, int *status) {
 	struct Client item;
 	struct node *destroy = NULL;
-	
+	*status = FALSE;
 	
 	if (queue->head != NULL) {
+		*status = TRUE;
 		destroy = queue->head;
 		item = destroy->data;
 		queue->head = destroy->next;
