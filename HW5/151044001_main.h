@@ -1,6 +1,18 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <string.h>
+#include <errno.h>
+#include <time.h>
+#include <math.h>
+
 #define ZERO 0
 #define TRUE 1
 #define FALSE 0
@@ -14,10 +26,10 @@
 #define DATA_DELIMITERS "():;, \n"
 #define EMPTY_STRING "\n"
 #define READ_MODE "r"
-
 #define DELIVERY_CONSTANT 5
 #define STRING_LENGTH 64
 #define ARRAY_LENGTH 50
+
 
 
 struct Florist {
@@ -45,9 +57,10 @@ struct Statistic {
 
 
 
-void ParseFile(char *fileName, struct Florist **florists, struct Client **clients, int *floristCount, int *clientCount);
 void *FloristThread(void *parameter);
+float Distance(int x1, int y1, int x2, int y2);
 int GetProperFloristForClient(struct Client client, struct Florist *florists, int floristCount);
 int GotFlowerOfType(char *required, char saleList[ARRAY_LENGTH][STRING_LENGTH], int flowerCount);
-float Distance(int x1, int y1, int x2, int y2);
+void ParseFile(char *fileName, struct Florist **florists, struct Client **clients, int *floristCount, int *clientCount);
+
 #endif
