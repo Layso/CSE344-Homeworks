@@ -33,7 +33,7 @@ compilecpp:
 
 
 linkc:
-	gcc -o $(execName) *.o -pthread
+	gcc -o $(execName) *.o -pthread -lm
 
 linkcpp:
 	g++ -o $(execName) *.o
