@@ -24,7 +24,7 @@ compilec:
 	gcc -c *.c
 
 compilecansi:
-	gcc -c *.c -ansi -Wall -pedantic -error
+	gcc -c *.c -ansi -pedantic -error
 
 compilecpp:
 	g++ -c *.cpp
