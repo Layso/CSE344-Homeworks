@@ -8,7 +8,7 @@ args = 3169 data.dat log.dat
 
 extraFilesToClear = 
 
-
+extraLibsToLink = -pthread
 
 
 allc: compilec linkc run
@@ -33,10 +33,10 @@ compilecpp:
 
 
 linkc:
-	gcc -o $(execName) *.o
+	gcc -o $(execName) *.o $(extraLibsToLink)
 
 linkcpp:
-	g++ -o $(execName) *.o
+	g++ -o $(execName) *.o $(extraLibsToLink)
 
 
 

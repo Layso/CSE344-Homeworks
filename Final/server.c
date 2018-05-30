@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include "queue.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,6 +7,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <pthread.h>
 
 
 
@@ -35,17 +37,24 @@ struct Provider {
 
 
 int ParseFile(const char *fileName, struct Provider **providerArray, int *arrayLength);
+void *ProviderFunction(void *param);
 
+
+
+Queue **queues;
+pthread_cond_t *conds;
+pthread_mutex_t *mutexes;
 
 
 
 int main(int argc, char **argv) {
-	int i;
+	int i, j;
 	int portNo;
 	int providerCount;
 	char *logFileName = NULL;
 	char *dataFileName = NULL;
 	struct Provider *providers = NULL;
+	pthread_t *tids;
 	
 	
 	/* Checking argument count to print usage in case of error */
@@ -68,18 +77,60 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 	
+	/* Allocationg space for arrays */
+	queues = calloc(providerCount, sizeof(Queue*));
+	tids = calloc(providerCount, sizeof(pthread_t));
+	conds = calloc(providerCount, sizeof(pthread_cond_t));
+	mutexes = calloc(providerCount, sizeof(pthread_mutex_t));
+	for (i=0; i<providerCount; ++i) {
+		QueueInitialize(&queues[i]);
+		if (pthread_mutex_init(&mutexes[i], NULL) == ERROR_CODE) {
+			
+		}
+		
+		if (pthread_cond_init(&conds[i], NULL) == ERROR_CODE) {
+			
+		}
+		
+		if (pthread_create(&tids[i], NULL, ProviderFunction, &providers[i]) == ERROR_CODE) {
+			
+		}
+	}
+	
+	/*
 	else {
 		for (i=0; i<providerCount; ++i) {
 			printf("Name: %s\nPrice: %d\nDuration: %d\nPerformance: %d\n\n", providers[i].name, providers[i].price, providers[i].duration, providers[i].performance);
 		}
 	}
+	*/
 	
+	
+	/* Destroying elements of each provider */
+	for (i=0; i<providerCount; ++i) {
+		pthread_join(tids[i], NULL);
+		QueueDestruct(queues[i]);
+		pthread_cond_destroy(&conds[i]);
+		pthread_mutex_destroy(&mutexes[i]);
+	}
 	
 	
 	/* Deallocating dynamic variables */
+	free(conds);
+	free(queues);
+	free(mutexes);
 	free(providers);
 	
 	return EXIT_SUCCESS;
+}
+
+
+
+void *ProviderFunction(void *param) {
+	struct Provider info = *(struct Provider*)param;
+	printf("Provider %s online\n", info.name);
+	
+	return NULL;
 }
 
 
