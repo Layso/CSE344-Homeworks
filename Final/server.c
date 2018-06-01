@@ -42,6 +42,17 @@ struct Provider {
 	int performance;
 };
 
+/* Structure to hold client informations */
+struct Client {
+	char name[STRING_LENGTH];
+	
+};
+
+/* Structure to hold provider informations */
+struct Statistic {
+	char name[STRING_LENGTH];
+	
+};
 
 
 int CreateConnection(int portNo);
@@ -103,6 +114,7 @@ int main(int argc, char **argv) {
 	/* Setting signal handler for SIGINT */
 	action.sa_handler = SignalHandler;
 	sigaction(SIGINT, &action, NULL);
+	
 	
 	/* Initializing queue, mutex and a condition variable for each provider */
 	for (i=0; i<providerCount; ++i) {
