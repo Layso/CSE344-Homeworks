@@ -7,7 +7,11 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <pthread.h>
+#include <signal.h>
 
 
 
@@ -23,12 +27,16 @@
 #define STRING_LENGTH 100
 #define READ_MODE "r"
 #define NULL_CHARACTER '\0'
+#define LOCAL_IP_ADDRESS "127.0.0.1"
+#define DEFAULT_OPTIONS 0
+#define CLIENT_QUEUE_LIMIT 25
 
 
 
 /* Structure to hold provider informations */
 struct Provider {
 	char name[STRING_LENGTH];
+	int id;
 	int price;
 	int duration;
 	int performance;
@@ -36,11 +44,14 @@ struct Provider {
 
 
 
+int CreateConnection(int portNo);
 int ParseFile(const char *fileName, struct Provider **providerArray, int *arrayLength);
 void *ProviderFunction(void *param);
+void SignalHandler(int signo);
 
 
 
+int working;
 Queue **queues;
 pthread_cond_t *conds;
 pthread_mutex_t *mutexes;
@@ -48,13 +59,16 @@ pthread_mutex_t *mutexes;
 
 
 int main(int argc, char **argv) {
-	int i, j;
+	int i;
 	int portNo;
+	int serverSocket;
 	int providerCount;
 	char *logFileName = NULL;
 	char *dataFileName = NULL;
 	struct Provider *providers = NULL;
+	struct sigaction action;
 	pthread_t *tids;
+	
 	
 	
 	/* Checking argument count to print usage in case of error */
@@ -77,45 +91,78 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 	
-	/* Allocationg space for arrays */
+	/* Allocationg space for arrays and initializing variables */
+	working = TRUE;
+	memset(&action, ZERO, sizeof(action));
 	queues = calloc(providerCount, sizeof(Queue*));
 	tids = calloc(providerCount, sizeof(pthread_t));
 	conds = calloc(providerCount, sizeof(pthread_cond_t));
 	mutexes = calloc(providerCount, sizeof(pthread_mutex_t));
+	
+	
+	/* Setting signal handler for SIGINT */
+	action.sa_handler = SignalHandler;
+	sigaction(SIGINT, &action, NULL);
+	
+	/* Initializing queue, mutex and a condition variable for each provider */
 	for (i=0; i<providerCount; ++i) {
 		QueueInitialize(&queues[i]);
-		if (pthread_mutex_init(&mutexes[i], NULL) == ERROR_CODE) {
-			
+		if (pthread_mutex_init(&mutexes[i], NULL) == ERROR_CODE) {			
+			fprintf(stderr, "\nSystem Error!\nMutex initializiation failed\n%s\n", strerror(errno));
+			return EXIT_FAILURE;
 		}
 		
 		if (pthread_cond_init(&conds[i], NULL) == ERROR_CODE) {
-			
+			fprintf(stderr, "\nSystem Error!\nCondition variable initializiation failed\n%s\n", strerror(errno));
+			return EXIT_FAILURE;
 		}
 		
 		if (pthread_create(&tids[i], NULL, ProviderFunction, &providers[i]) == ERROR_CODE) {
-			
+			fprintf(stderr, "\nSystem Error!\nThread initializiation failed\n%s\n", strerror(errno));
+			return EXIT_FAILURE;
 		}
 	}
 	
-	/*
-	else {
-		for (i=0; i<providerCount; ++i) {
-			printf("Name: %s\nPrice: %d\nDuration: %d\nPerformance: %d\n\n", providers[i].name, providers[i].price, providers[i].duration, providers[i].performance);
+	
+	/* If socket creation is succesfull, accept any connection until termination signal arrives */
+	serverSocket = CreateConnection(portNo);
+	if (serverSocket != ERROR_CODE) {
+		while (working) {
+			/* TODO:
+			Accept client
+			Create new thread to communicate with client
+			*/
 		}
 	}
-	*/
 	
+	
+	/* Getting locks and declaring server is shutting down */
+	for (i=0; i<providerCount; ++i) {
+		pthread_mutex_lock(&mutexes[i]);
+	}
+	working = FALSE;
+	for (i=0; i<providerCount; ++i) {
+		pthread_mutex_unlock(&mutexes[i]);
+	}
 	
 	/* Destroying elements of each provider */
 	for (i=0; i<providerCount; ++i) {
+		/* Joining thread before taking actions against it */
+		pthread_cond_signal(&conds[i]);
 		pthread_join(tids[i], NULL);
+		
+		/* Destroying queue, mutex and condition variable of the provider */
 		QueueDestruct(queues[i]);
 		pthread_cond_destroy(&conds[i]);
 		pthread_mutex_destroy(&mutexes[i]);
 	}
 	
+	/* TODO:
+	Log the statistics
+	*/
 	
 	/* Deallocating dynamic variables */
+	free(tids);
 	free(conds);
 	free(queues);
 	free(mutexes);
@@ -128,14 +175,72 @@ int main(int argc, char **argv) {
 
 void *ProviderFunction(void *param) {
 	struct Provider info = *(struct Provider*)param;
-	printf("Provider %s online\n", info.name);
+	printf("Name:%s ID:%d Perf:%d Price:%d Dura:%d\n", info.name, info.id, info.performance, info.price, info.duration);
 	
+	while(working) {
+		pthread_mutex_lock(&mutexes[info.id]);
+		while (working){
+			printf("%s sleeping\n", info.name);
+			pthread_cond_wait(&conds[info.id], &mutexes[info.id]);
+		}
+		
+		/* TODO: 
+		Get client and do homework
+		Update the statistics
+		Check if duration is passed to log off
+		*/
+		pthread_mutex_unlock(&mutexes[info.id]);
+	}
+	
+	printf("Provider %s offline\n", info.name);
 	return NULL;
 }
 
 
 
+int CreateConnection(int portNo) {
+	int sock;
+	struct sockaddr_in address;
+	
+	
+	/* Perparing socket address */
+	address.sin_port = portNo;
+	address.sin_family = AF_INET;
+	address.sin_addr.s_addr = inet_addr(LOCAL_IP_ADDRESS);
+	
+	/* Creating socket */
+	sock = socket(AF_INET, SOCK_STREAM, DEFAULT_OPTIONS);
+	if (sock == ERROR_CODE) {
+		fprintf(stderr, "\nSystem Error!\nSocket creation faield\n%s\n", strerror(errno));
+		return ERROR_CODE;
+	}
+	
+	/* Binding socket to server address */
+	if (bind(sock, &address, sizeof(address)) == ERROR_CODE) {
+		fprintf(stderr, "\nSystem Error!\nSocket address binding failed\n%s\n", strerror(errno));
+		return ERROR_CODE;
+	}
+	
+	/* Setting socket as passive socket */
+	if (listen(sock, CLIENT_QUEUE_LIMIT) == ERROR_CODE) {
+		fprintf(stderr, "\nSystem Error!\nListening server socket failed\n%s\n", strerror(errno));
+		return ERROR_CODE;
+	}
+	
+	
+	return sock;
+}
+
+
+
+void SignalHandler(int signo) {
+	working = FALSE;
+}
+
+
+
 int ParseFile(const char *fileName, struct Provider **providerArray, int *arrayLength) {
+	int i = ZERO;
 	char *line = NULL;
 	FILE *filePtr = NULL;
 	char newName[STRING_LENGTH];
@@ -172,6 +277,7 @@ int ParseFile(const char *fileName, struct Provider **providerArray, int *arrayL
 			*providerArray = realloc(*providerArray, (*arrayLength) * sizeof(struct Provider));
 			
 			strcpy((*providerArray)[*arrayLength-1].name, newName);
+			(*providerArray)[*arrayLength-1].id = i++;
 			(*providerArray)[*arrayLength-1].price = atoi(newPrice);
 			(*providerArray)[*arrayLength-1].duration = atoi(newDuration);
 			(*providerArray)[*arrayLength-1].performance = atoi(newPerformance);
