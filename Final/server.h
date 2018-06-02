@@ -17,11 +17,14 @@ struct Provider {
 /* Structure to hold client informations */
 struct Client {
 	char name[STRING_LENGTH];
+	int homework;
 };
 
 /* Structure to hold provider informations */
 struct Statistic {
 	char name[STRING_LENGTH];
+	int count;
+	
 };
 
 

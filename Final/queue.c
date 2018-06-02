@@ -7,13 +7,15 @@
 
 #define TRUE 1
 #define FALSE 0
-
+#define ZERO 0
+#define PROVIDER_LIMIT 2
 
 
 void QueueInitialize(Queue **queue) {
 	if (*queue == NULL) {
 		*queue = malloc(sizeof(Queue));
 		(*queue)->head = NULL;
+		(*queue)->size = ZERO;
 	}
 }
 
@@ -39,7 +41,7 @@ void QueueDestruct(Queue *queue) {
 
 
 
-void QueueOffer(Queue *queue, struct Client item) {
+void QueueOffer(Queue *queue, int item) {
 	struct node *current = NULL;
 	
 	
@@ -61,22 +63,23 @@ void QueueOffer(Queue *queue, struct Client item) {
 			current->next = NULL;
 			current->data = item;
 		}
+		
+		++(queue->size);
 	}
 }
 
 
 
-struct Client QueuePoll(Queue *queue, int *status) {
-	struct Client item;
+int QueuePoll(Queue *queue) {
+	int item;
 	struct node *destroy = NULL;
-	*status = FALSE;
 	
 	if (queue->head != NULL) {
-		*status = TRUE;
 		destroy = queue->head;
 		item = destroy->data;
 		queue->head = destroy->next;
 		free(destroy);
+		--(queue->size);
 	}
 	
 	return item;
@@ -86,4 +89,9 @@ struct Client QueuePoll(Queue *queue, int *status) {
 
 int QueueEmpty(Queue *queue) {
 	return (queue == NULL || queue->head == NULL);
+}
+
+
+int QueueIsFull(Queue *queue) {
+	return queue->size == PROVIDER_LIMIT;
 }

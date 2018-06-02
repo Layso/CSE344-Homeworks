@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include "server.h"
 #include "queue.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +9,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
@@ -162,24 +164,51 @@ int main(int argc, char **argv) {
 
 void *ProviderFunction(void *param) {
 	struct Provider info = *(struct Provider*)param;
+	int status;
+	int newClient;
+	int i = info.id;
+	int timedOut = FALSE;
+	struct timespec wakeTime;
+	
+	
+	/* Setting time of waking up */
+	wakeTime.tv_sec = time(NULL) + info.duration;
+	wakeTime.tv_nsec = 0;
 	printf("Name:%s ID:%d Perf:%d Price:%d Dura:%d\n", info.name, info.id, info.performance, info.price, info.duration);
 	
-	while(working) {
-		pthread_mutex_lock(&mutexes[info.id]);
-		while (working){
+	
+	/* Stay signed in until either server shuts down or duration is up */
+	while(working && !timedOut) {
+		pthread_mutex_lock(&mutexes[i]);
+		while (working && !timedOut && QueueEmpty(queues[i])){
 			printf("%s sleeping\n", info.name);
-			pthread_cond_wait(&conds[info.id], &mutexes[info.id]);
+			status = pthread_cond_timedwait(&conds[i], &mutexes[i], &wakeTime);
+			if (status == ETIMEDOUT) {
+				timedOut = TRUE;
+			}
 		}
 		
-		/* TODO: 
-		Get client and do homework
-		Update the statistics
-		Check if duration is passed to log off
-		*/
-		pthread_mutex_unlock(&mutexes[info.id]);
+		/* If server is still working and not timedout, get new client socket and release mutex */
+		if (!timedOut && working) {
+			newClient = QueuePoll(queues[i]);
+		}		
+		pthread_mutex_unlock(&mutexes[i]);
+		
+		
+		if (timedOut) {
+			fprintf(stderr, "Provider %s logging off due to time out\n", info.name);
+		}
+		
+		else if (!working) {
+			fprintf(stderr, "Provider %s logging off due to server shutting down\n", info.name);
+		}
+		
+		else {
+			
+		}
 	}
 	
-	printf("Provider %s offline\n", info.name);
+	
 	return NULL;
 }
 
