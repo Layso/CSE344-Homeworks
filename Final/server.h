@@ -61,5 +61,8 @@ int ParseFile(const char *fileName, struct Provider **providerArray, int *arrayL
 void *ProviderFunction(void *param);
 void *RedirectorFunction(void *param);
 void SignalHandler(int signo);
+double power(double x, int n);
+int factorial(int x);
+double cosine(int degree);
 
 #endif

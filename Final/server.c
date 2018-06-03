@@ -28,13 +28,17 @@
 #define INDEX_PORT 1
 #define INDEX_DATA 2
 #define INDEX_LOG 3
+#define PI 3.14
+#define TAYLOR_N 15
+#define ONE 1
+#define HALF_A_DEGREE 180
 #define STRING_LENGTH 100
 #define READ_MODE "r"
 #define NULL_CHARACTER '\0'
 #define LOCAL_IP_ADDRESS "127.0.0.1"
 #define DEFAULT_OPTIONS 0
 #define CLIENT_QUEUE_LIMIT 25
-#define ARRAY_SIZE 25
+#define ARRAY_SIZE 2000
 #define PRIORITY_COST 'C'
 #define PRIORITY_PERFORMANCE 'Q'
 #define PRIORITY_SPEED 'T'
@@ -469,6 +473,7 @@ void *RedirectorFunction(void *param) {
 		newWork.clientSocket = client;
 		newWork.request = clientRequest;
 		QueueOffer(queues[optimumIndex], newWork);
+		printf("Client %s (%c %d) connected, forwarded to provider %s\n", clientRequest.name, clientRequest.priority, clientRequest.homework, providers[optimumIndex].name);
 		if (pthread_cond_signal(&conds[optimumIndex]) == ERROR_CODE) {
 			fprintf(stderr, "\nSystem Error\nFailed to signal condition variable after adding new work to provider\n%s\n", strerror(errno));
 			LogStats(EXIT_FAILURE);
@@ -521,7 +526,7 @@ int ReceiveAll(int sock, struct Request *item, int size) {
 
 
 double DoHomework(int homework) {
-	return (homework * 45796) / 10000;	
+	return cosine(homework);
 }
 
 
@@ -651,3 +656,56 @@ int ParseFile(const char *fileName, struct Provider **providerArray, int *arrayL
 	return ZERO;
 }
 
+
+
+double power(double x, int n) {
+	double result = ONE;
+	int i;
+	
+	
+	for(i=0; i<n; ++i) {
+		result *= x;
+	}
+	
+	return result;
+}
+
+
+
+int factorial(int x) {
+	int initial = ONE;
+	int result = ONE;
+	
+	
+	while (initial<=x && x>ONE) {
+		result *= initial;
+		++initial; 
+	}
+	
+	return result;
+}
+
+
+
+double cosine(int degree) {
+	int i;
+	int temp;
+	double radian;
+	double sumResult;
+	
+	
+	sumResult = ZERO;
+	temp = degree%HALF_A_DEGREE;
+	radian = (temp*PI)/HALF_A_DEGREE;
+	
+	for (i=0; i<TAYLOR_N; ++i) {
+		sumResult += (power(-1,i) * power(radian,(DOUBLE*i))) / (factorial((DOUBLE*i)));
+	}
+	
+	/* Change sign according to regions */
+	if (degree>180 && degree<270) {
+		sumResult = -sumResult;
+	}
+	
+	return sumResult;
+}

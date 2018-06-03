@@ -50,8 +50,10 @@ int main(int argc, char **argv) {
 	int server;
 	struct Request request;
 	struct Response response;
+	struct timeval t1, t2;
 	
-
+	
+	
 	/* Checking argument count to print usage in case of error */
 	if (argc != REQUIRED_ARGC) {
 		fprintf(stderr, "\nError!\nInvalid argument count\nUsage: %s [name] [priority] [homeWork] [ip] [portNo]\n", argv[INDEX_EXEC]);
@@ -71,14 +73,17 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 	
+	strcpy(request.name, name);
+	request.homework = homework;
+	request.priority = priority;
+	
+	
 	server = CreateConnection(ip, port);
 	if (server == ERROR_CODE) {
 		return ERROR_CODE;
 	}
 	
-	strcpy(request.name, name);
-	request.homework = homework;
-	request.priority = priority;
+	gettimeofday(&t1, NULL);
 	
 	printf("Client %s is requesting %c %d from server %s:%d\n", name, priority, port, ip, port);
 	if (SendAll(server, &request, sizeof(request)) == ERROR_CODE) {
@@ -91,8 +96,10 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 	
+	gettimeofday(&t2, NULL);
+	
 	if (response.status != ERROR_CODE) {
-		printf("%s's task completed by %s in %d.%d seconds, cos(%d)=%f, cost is %dTL\n", name, response.providerName, response.seconds, response.miliSeconds, homework, response.result, response.cost);
+		printf("%s's task completed by %s in %d.%d seconds, cos(%d)=%f, cost is %dTL, total time spent: %ld.%2ld\n", name, response.providerName, response.seconds, response.miliSeconds, homework, response.result, response.cost, t2.tv_sec-t1.tv_sec, (t2.tv_usec-t1.tv_usec)*1000);
 	}
 	
 	else {
