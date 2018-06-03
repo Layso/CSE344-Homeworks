@@ -1,11 +1,11 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
-
+#include "server.h"
 
 /* Struct to hold queue nodes */
 struct node {
-    int data;
+    struct Work data;
     struct node *next;
 };
 
@@ -19,8 +19,8 @@ typedef struct Queue {
 
 void QueueInitialize(Queue **queue);
 void QueueDestruct(Queue *queue);
-void QueueOffer(Queue *queue, int item);
-int QueuePoll(Queue *queue);
+void QueueOffer(Queue *queue, struct Work item);
+struct Work QueuePoll(Queue *queue);
 int QueueEmpty(Queue *queue);
 int QueueIsFull(Queue *queue);
 

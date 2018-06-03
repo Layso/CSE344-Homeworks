@@ -41,7 +41,7 @@ void QueueDestruct(Queue *queue) {
 
 
 
-void QueueOffer(Queue *queue, int item) {
+void QueueOffer(Queue *queue, struct Work item) {
 	struct node *current = NULL;
 	
 	
@@ -70,8 +70,8 @@ void QueueOffer(Queue *queue, int item) {
 
 
 
-int QueuePoll(Queue *queue) {
-	int item;
+struct Work QueuePoll(Queue *queue) {
+	struct Work item;
 	struct node *destroy = NULL;
 	
 	if (queue->head != NULL) {

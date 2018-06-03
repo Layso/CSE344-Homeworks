@@ -1,14 +1,23 @@
 leysö: clean compilecansi linkc
 
 
+portno = 2529
 
-execName = exe
+serverName = homeworkServer
+clientName = clientApp
 
-args = 3169 data.dat log.dat
+serverFiles = server.o queue.o
+clientFiles = client.o
 
-extraFilesToClear = 
+argsServer = $(portno) data.dat log.dat
+argsClient = hileci1 Q 45 127.0.0.1 $(portno)
 
-extraLibsToLink = -pthread
+serverLibs = -pthread
+clientLibs = 
+
+extraFilesToClear = log.dat
+
+
 
 
 allc: compilec linkc run
@@ -33,7 +42,8 @@ compilecpp:
 
 
 linkc:
-	gcc -o $(execName) *.o $(extraLibsToLink)
+	gcc -o $(serverName) $(serverFiles) $(serverLibs)
+	gcc -o $(clientName) $(clientFiles) $(clientLibs)
 
 linkcpp:
 	g++ -o $(execName) *.o $(extraLibsToLink)
@@ -41,16 +51,22 @@ linkcpp:
 
 
 
-run:
-	./$(execName) $(args)
+runServer:
+	./$(serverName) $(argsServer)
 
-runVal:
-	valgrind ./$(execName) $(args)
+runValServer:
+	valgrind ./$(serverName) $(argsServer)
+	
+runClient:
+	./$(clientName) $(argsClient)
+
+runValClient:
+	valgrind ./$(clientName) $(argsClient)
 
 
 
 clean: clear
-	rm -f *.o $(execName) $(extraFilesToClear)
+	rm -f *.o $(clientName) $(serverName) $(extraFilesToClear)
 
 clear:
 	clear
