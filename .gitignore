@@ -6,6 +6,8 @@
 **/multiprocess_DFT
 **/tiffProcessor
 **/shell
+**/clientApp
+**/homeworkServer
 
 # Data files
 *.tif
